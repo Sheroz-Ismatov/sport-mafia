@@ -270,3 +270,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
   .host-sticky .hint { font-size: 12px; }
 }
 @media (max-width: 380px) { .host-sticky { margin: -18px -12px 0; padding-left: 12px; padding-right: 12px; } }
+.sticky-sum { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; font-size: 14px; color: var(--soft); }
+.sticky-sum .k { font-weight: 700; color: var(--text); }
+.sticky-sum b { color: var(--text); }
+.sticky-sum b.t-civilian { color: var(--red-soft); }

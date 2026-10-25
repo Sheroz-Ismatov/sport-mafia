@@ -135,6 +135,10 @@ export function renderHost(store: Store): string {
   const blacks = alive.filter((s) => isBlackRole(s.role)).length;
   const dealing = game.phase === 'deal';
   const tab = store.hostTab;
+  // Сводка по столу всегда на виду в закреплённой шапке
+  const summary = dealing
+    ? `Карт роздано: <b>${game.seats.filter((s) => s.role).length} из ${game.seats.length}</b>`
+    : `Живых <b>${alive.length}</b> · красных <b class="t-civilian">${alive.length - blacks}</b> · чёрных <b>${blacks}</b>`;
   const pane = (name: string, html: string) =>
     `<div class="host-pane stack" style="display:${tab === name ? 'flex' : 'none'};gap:14px">${html}</div>`;
 
@@ -148,10 +152,10 @@ export function renderHost(store: Store): string {
       <div class="tabs" role="tablist" aria-label="Разделы панели">
         ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
       </div>
+      <div class="sticky-sum"><span class="k">За столом</span><span>${summary}</span></div>
     </div>
     <div class="host-grid">
-      ${pane('table', `<div class="row"><h2>Стол</h2><span class="hint">${dealing ? `Карт роздано: ${game.seats.filter((s) => s.role).length} из ${game.seats.length}` : `Живых ${alive.length}: красных ${alive.length - blacks}, чёрных ${blacks}`}</span></div>
-        <div class="stack">${seatRows(store, game)}</div>
+      ${pane('table', `<div class="stack">${seatRows(store, game)}</div>
         <p class="hint">3-й фол: игрок молчит ближайшую минуту. 4-й фол удаляет его автоматически, голосование дня отменяется.</p>
         ${nominationsCard(game)}`)}
       <div class="stack" style="gap:14px">
