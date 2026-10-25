@@ -64,8 +64,8 @@ function controlCard(store: Store, game: GameView): string {
   }
 
   return `<div class="card accent">
-    <div class="row"><div class="stack" style="gap:2px"><span class="eyebrow">${label}</span><b style="font-size:19px">${who}</b></div>
-      <span class="clock" data-clock style="font-size:36px;font-weight:800;color:${paused ? 'var(--amber)' : 'var(--blue)'}">${left === null ? '' : clock(left)}</span></div>
+    <div class="row"><div class="stack" style="gap:2px;min-width:0"><span class="eyebrow">${label}</span><b class="ctl-who">${who}</b></div>
+      <span class="clock ctl-clock" data-clock style="color:${paused ? 'var(--amber)' : 'var(--blue)'}">${left === null ? '' : clock(left)}</span></div>
     ${paused ? '<p class="hint" style="color:var(--amber)">Пауза. Микрофон говорящего остаётся включённым.</p>' : ''}
     ${extra}
     <div class="grid3 controls">
@@ -138,13 +138,16 @@ export function renderHost(store: Store): string {
   const pane = (name: string, html: string) =>
     `<div class="host-pane stack" style="display:${tab === name ? 'flex' : 'none'};gap:14px">${html}</div>`;
 
+  // Шапка, таймер с кнопками и вкладки закреплены сверху: прокручивается только то, что ниже
   return `<div class="screen wide">
-    <div class="top"><div class="top-left"><span class="eyebrow">Комната ${esc(room.code)} · вы ведущий</span>
-      <h1>${phaseTitle(game)}</h1></div>
-      <span class="pill">${room.spectators} зрит.</span></div>
-    ${controlCard(store, game)}
-    <div class="tabs" role="tablist" aria-label="Разделы панели">
-      ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
+    <div class="host-sticky">
+      <div class="top"><div class="top-left"><span class="eyebrow">Комната ${esc(room.code)} · вы ведущий</span>
+        <h1>${phaseTitle(game)}</h1></div>
+        <span class="pill">${room.spectators} зрит.</span></div>
+      ${controlCard(store, game)}
+      <div class="tabs" role="tablist" aria-label="Разделы панели">
+        ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
+      </div>
     </div>
     <div class="host-grid">
       ${pane('table', `<div class="row"><h2>Стол</h2><span class="hint">${dealing ? `Карт роздано: ${game.seats.filter((s) => s.role).length} из ${game.seats.length}` : `Живых ${alive.length}: красных ${alive.length - blacks}, чёрных ${blacks}`}</span></div>
