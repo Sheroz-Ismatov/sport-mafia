@@ -1,0 +1,9 @@
+# Настройки для Render: как собрать и запустить игру.
+services:
+  - type: web
+    name: sport-mafia
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run serve
+    healthCheckPath: /health

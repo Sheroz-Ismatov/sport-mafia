@@ -1,0 +1,27 @@
+{
+  "name": "sport-mafia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Спортивная мафия онлайн: игровой движок и сервер комнат",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18 <25"
+  },
+  "scripts": {
+    "start": "node client/build.ts && node server/index.ts",
+    "serve": "node server/index.ts",
+    "build": "node client/build.ts",
+    "dev": "node client/build.ts --watch",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.9.0"
+  }
+}
