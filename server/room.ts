@@ -2,7 +2,7 @@
 // Ничего не знает о WebSocket: каждому участнику просто дают функцию send().
 
 import { randomUUID } from 'node:crypto';
-import { Game, viewFor } from '../engine/index.ts';
+import { Game, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine/index.ts';
 import type { Action, Actor, Settings, Viewer } from '../engine/index.ts';
 import { botAction } from './bots.ts';
 import type { ClientMessage, MemberInfo, MemberKind, RoomInfo, ServerMessage } from './protocol.ts';
@@ -65,7 +65,7 @@ export class Room {
     for (let i = 2; taken.has(nick.toLowerCase()); i++) nick = `${cleanNick(rawNick).slice(0, MAX_NICK - 3)} ${i}`;
 
     // Стол заполнен или игра уже идёт — входим наблюдателем
-    if (kind === 'player' && (this.game || this.players().length >= 10)) kind = 'spectator';
+    if (kind === 'player' && (this.game || this.players().length >= MAX_PLAYERS)) kind = 'spectator';
     if (kind === 'spectator' && this.spectators().length >= this.opts.maxSpectators) {
       throw new Error('В комнате нет мест для зрителей');
     }
@@ -138,7 +138,7 @@ export class Room {
     if (!this.isOwner(m)) return 'Ботов добавляет создатель комнаты';
     if (this.game) return 'Игра уже идёт';
     const names = ['Бот Аня', 'Бот Борис', 'Бот Вика', 'Бот Гоша', 'Бот Даша', 'Бот Егор', 'Бот Женя', 'Бот Зоя', 'Бот Илья', 'Бот Катя'];
-    for (let i = 0; this.players().length < 10; i++) this.addMember(names[i % names.length], 'player', true);
+    for (let i = 0; this.players().length < MAX_PLAYERS; i++) this.addMember(names[i % names.length], 'player', true);
     this.broadcast();
     return null;
   }
@@ -147,7 +147,7 @@ export class Room {
     if (!this.isOwner(m)) return 'Начать игру может только создатель комнаты';
     if (this.game) return 'Игра уже идёт';
     const players = this.players();
-    if (players.length !== 10) return `За столом ${players.length} из 10 игроков`;
+    if (players.length < MIN_PLAYERS) return `За столом ${players.length}, нужно хотя бы ${MIN_PLAYERS}`;
     const game = new Game(this.opts.settings, this.opts.rng);
     const r = game.dispatch({ kind: 'host' }, {
       type: 'start',
@@ -217,13 +217,22 @@ export class Room {
     const endsAt = this.game?.timer?.endsAt;
     if (endsAt == null || this.game!.phase === 'ended') return;
     const delay = Math.max(0, endsAt - this.opts.now());
-    this.timer = setTimeout(() => {
+    this.timer = setTimeout(() => this.safely(() => {
       this.timer = null;
       const game = this.game;
       if (!game || game.timer?.endsAt !== endsAt) return; // таймер успели поменять
       const r = game.dispatch({ kind: 'system' }, { type: 'timeout' }, this.opts.now());
       if (r.ok) this.afterChange();
-    }, delay);
+    }), delay);
+  }
+
+  /** Ошибка в одной комнате не должна ронять весь сервер: пишем в лог и продолжаем. */
+  private safely(fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`Комната ${this.code}: ошибка в таймере`, e);
+    }
   }
 
   private scheduleBots(): void {
@@ -235,7 +244,7 @@ export class Room {
       if (seat === null || !botAction(game, seat, this.opts.rng)) continue;
       const [lo, hi] = this.opts.botDelayMs;
       const delay = lo + this.opts.rng() * (hi - lo);
-      this.botTimers.set(m.token, setTimeout(() => {
+      this.botTimers.set(m.token, setTimeout(() => this.safely(() => {
         this.botTimers.delete(m.token);
         const g = this.game;
         if (!g) return;
@@ -243,7 +252,7 @@ export class Room {
         const action = botAction(g, seat, this.opts.rng);
         if (action && g.dispatch({ kind: 'seat', seat }, action, this.opts.now()).ok) this.afterChange();
         else this.scheduleBots();
-      }, delay));
+      }), delay));
     }
   }
 

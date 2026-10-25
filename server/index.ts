@@ -125,12 +125,20 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             room.ownerToken = member.token;
           } else {
             const found = rooms.get(String(msg.code ?? '').trim().toUpperCase());
-            if (!found) return error('Комната не найдена');
+            if (!found) {
+              // Комнаты живут в памяти: после перезапуска сервера их нет
+              if (msg.t === 'resume') {
+                return send({ t: 'error', code: 'room_gone', message: 'Игра прервалась: сервер перезапускался, и комната закрылась. Создайте новую.' });
+              }
+              return error('Комната не найдена');
+            }
             if (msg.t === 'join') {
               member = found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player');
             } else {
               member = found.members.get(String(msg.token)) ?? null;
-              if (!member || member.bot) return error('Не удалось вернуться в комнату, войдите заново');
+              if (!member || member.bot) {
+                return send({ t: 'error', code: 'room_gone', message: 'Не удалось вернуться в комнату, войдите заново' });
+              }
             }
             room = found;
           }
@@ -184,6 +192,9 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
 
 // Запуск напрямую: node server/index.ts
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  // Последняя страховка: непредвиденная ошибка попадает в лог, а сервер продолжает работать
+  process.on('uncaughtException', (e) => console.error('Непредвиденная ошибка', e));
+  process.on('unhandledRejection', (e) => console.error('Необработанный отказ', e));
   const port = Number(process.env.PORT ?? 8080);
   // TIMER_SCALE=0.2 — все таймеры в 5 раз короче, удобно для проверки с ботами
   const scale = Number(process.env.TIMER_SCALE ?? 1);

@@ -34,6 +34,24 @@ export const DEFAULT_SETTINGS: Settings = {
   dealTurnMs: 6_000,       // 10 игроков × 6 с = минута на раздачу
 };
 
+/** За столом от 6 до 10 игроков. */
+export const MIN_PLAYERS = 6;
+export const MAX_PLAYERS = 10;
+
+/**
+ * Состав ролей по числу игроков. Полный стол (10): 6 мирных, шериф, 2 мафии, дон — как в регламенте.
+ * Неполный стол (6-9) — упрощённый вариант не по регламенту: чёрных двое (дон и мафия), шериф остаётся.
+ */
+export function roleCounts(players: number): Record<Role, number> {
+  const blacks = players >= 10 ? 3 : 2;
+  return { civilian: players - blacks - 1, sheriff: 1, mafia: blacks - 1, don: 1 };
+}
+
+export function roleDeck(players: number): Role[] {
+  const c = roleCounts(players);
+  return (Object.keys(c) as Role[]).flatMap((r) => Array<Role>(c[r]).fill(r));
+}
+
 export type OutReason = 'voted' | 'killed' | 'removed';
 
 export interface Seat {

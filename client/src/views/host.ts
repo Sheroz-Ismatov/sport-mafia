@@ -68,7 +68,7 @@ function controlCard(store: Store, game: GameView): string {
       <span class="clock" data-clock style="font-size:36px;font-weight:800;color:${paused ? 'var(--amber)' : 'var(--blue)'}">${left === null ? '' : clock(left)}</span></div>
     ${paused ? '<p class="hint" style="color:var(--amber)">Пауза. Микрофон говорящего остаётся включённым.</p>' : ''}
     ${extra}
-    <div class="grid3">
+    <div class="grid3 controls">
       <button class="btn small" data-act="${paused ? 'resume' : 'pause'}" ${game.timer ? '' : 'disabled'}>${paused ? 'Продолжить' : 'Пауза'}</button>
       <button class="btn small" data-act="add30" ${game.timer ? '' : 'disabled'}>+30 с</button>
       <button class="btn small primary" data-act="next">${next}</button>
@@ -147,7 +147,7 @@ export function renderHost(store: Store): string {
       ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
     </div>
     <div class="host-grid">
-      ${pane('table', `<div class="row"><h2>Стол</h2><span class="hint">${dealing ? `Карт роздано: ${game.seats.filter((s) => s.role).length} из 10` : `Живых ${alive.length}: красных ${alive.length - blacks}, чёрных ${blacks}`}</span></div>
+      ${pane('table', `<div class="row"><h2>Стол</h2><span class="hint">${dealing ? `Карт роздано: ${game.seats.filter((s) => s.role).length} из ${game.seats.length}` : `Живых ${alive.length}: красных ${alive.length - blacks}, чёрных ${blacks}`}</span></div>
         <div class="stack">${seatRows(store, game)}</div>
         <p class="hint">3-й фол: игрок молчит ближайшую минуту. 4-й фол удаляет его автоматически, голосование дня отменяется.</p>
         ${nominationsCard(game)}`)}

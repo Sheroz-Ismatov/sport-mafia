@@ -36,7 +36,7 @@ export function pickMode(game: GameView): PickMode | null {
       return { kind: 'check', max: 1, allow: (n) => n !== me.seat };
     }
     if (game.nightStep === 'bestMove' && game.bestMoveBy === me.seat && !game.bestMove) {
-      return { kind: 'bestMove', max: 3, allow: (n) => n !== me.seat };
+      return { kind: 'bestMove', max: game.bestMoveSize, allow: (n) => n !== me.seat };
     }
   }
   return null;
@@ -80,7 +80,7 @@ function selectionButton(store: Store, mode: PickMode): string {
         ? `<button class="btn primary" data-act="confirm">Проверить ${list}</button>`
         : '<p class="hint">Выберите, кого проверить</p>';
     case 'bestMove':
-      return `<p class="hint">Выберите до трёх номеров, кого считаете чёрными: ${sel.length}/3</p>
+      return `<p class="hint">Выберите, кого считаете чёрными: ${sel.length} из ${mode.max}</p>
         <button class="btn gold" data-act="confirm" ${sel.length ? '' : 'disabled'}>Отправить лучший ход${sel.length ? ': ' + sel.join(', ') : ''}</button>`;
     default:
       return '';
@@ -168,7 +168,7 @@ function dealPanel(store: Store, game: GameView): string {
   } else hint = `Тянет карту №${d.turn}`;
 
   parts.push(`<div class="card${myTurn ? ' gold' : ''}">
-    <div class="row"><h2>Колода</h2><span class="hint">${d.takenBy.filter((x) => x === null).length} из 10</span></div>
+    <div class="row"><h2>Колода</h2><span class="hint">${d.takenBy.filter((x) => x === null).length} из ${d.takenBy.length}</span></div>
     <p class="note">${hint}</p>
     <div class="deck${myTurn ? ' my-turn' : ''}">${slots}</div>
   </div>`);

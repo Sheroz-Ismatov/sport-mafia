@@ -87,8 +87,8 @@ export function winnerText(game: GameView): string {
   return 'Игра окончена';
 }
 
-/** Центр места на круглом столе в процентах. Место №1 сверху, дальше по часовой. */
-export function seatPosition(n: number): { left: number; top: number } {
-  const angle = (-90 + (n - 1) * 36) * Math.PI / 180;
+/** Центр места на круглом столе в процентах. Место №1 сверху, дальше по часовой. total — мест за столом. */
+export function seatPosition(n: number, total = 10): { left: number; top: number } {
+  const angle = (-90 + (n - 1) * (360 / total)) * Math.PI / 180;
   return { left: 50 + 39 * Math.cos(angle), top: 50 + 38.5 * Math.sin(angle) };
 }

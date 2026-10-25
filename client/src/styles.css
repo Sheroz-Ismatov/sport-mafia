@@ -40,8 +40,9 @@ button:disabled { cursor: default; }
 /* ---------- Каркас ---------- */
 .screen { max-width: 460px; margin: 0 auto; padding: 18px 16px 32px; display: flex; flex-direction: column; gap: 14px; }
 .screen.wide { max-width: 1240px; }
-.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.top-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Шапка: если заголовку тесно рядом с плашкой роли, плашка уходит на следующую строку */
+.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 12px; }
+.top-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 150px; }
 .eyebrow { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
 h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 25px; line-height: 1.15; letter-spacing: -.01em; }
 h2 { margin: 0; font-size: 16px; font-weight: 800; }
@@ -62,8 +63,22 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- Кнопки ---------- */
-.btn { min-height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 15px; font-weight: 600; }
-.btn.primary, .btn.red, .btn.gold { font-family: var(--display); font-size: 14px; letter-spacing: .02em; }
+/* Кнопки: текст переносится, а не вылезает за край (узкие телефоны, длинные подписи) */
+.btn { min-height: 48px; padding: 6px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.2; white-space: normal; text-wrap: balance; min-width: 0; max-width: 100%; }
+.btn.primary, .btn.red, .btn.gold { font-weight: 700; }
+.grid2 > *, .grid3 > *, .grid4 > * { min-width: 0; }
+.grid3 .btn, .grid4 .btn { padding: 6px 8px; font-size: 14px; }
+/* Кнопки ведущего на узком телефоне: пауза и +30 с в ряд, главная кнопка на всю ширину */
+@media (max-width: 420px) {
+  .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .controls .btn.primary { grid-column: 1 / -1; }
+}
+@media (max-width: 380px) {
+  .btn { font-size: 14px; padding: 6px 10px; }
+  .grid3 .btn, .grid4 .btn, .btn.small, .btn.tiny { font-size: 12.5px; padding: 6px 6px; }
+  h1 { font-size: 22px; }
+  .screen { padding-left: 12px; padding-right: 12px; }
+}
 .btn:hover:not(:disabled) { border-color: var(--muted); }
 .btn:disabled { color: var(--dim); opacity: .7; }
 .btn.primary { background: var(--blue); border-color: var(--blue); color: #06131D; font-weight: 800; }
@@ -71,8 +86,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .btn.gold { background: var(--gold); border-color: var(--gold); color: #1A1406; font-weight: 800; }
 .btn.outline-red { background: transparent; border-color: var(--red); color: var(--red-soft); }
 .btn.ghost { background: transparent; }
-.btn.small { min-height: 40px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
-.btn.tiny { min-height: 36px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
+.btn.small { min-height: 40px; padding: 4px 12px; font-size: 13px; border-radius: 10px; }
+.btn.tiny { min-height: 36px; padding: 4px 10px; font-size: 13px; border-radius: 8px; }
 .btn.foul { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
 .btn.on { background: var(--gold); border-color: var(--gold); color: #1A1406; }
 .link { background: none; border: none; color: var(--blue-soft); font-weight: 600; font-size: 13px; padding: 8px 2px; min-height: 36px; }

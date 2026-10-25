@@ -73,7 +73,7 @@ export function botAction(game: Game, seat: number, rng: () => number = Math.ran
       }
       if (game.nightStep === 'bestMove' && game.nightKill === seat && !game.bestMove) {
         const seats: number[] = [];
-        while (seats.length < 3) {
+        while (seats.length < game.bestMoveSize()) {
           const n = pick(others.filter((x) => !seats.includes(x)), rng);
           if (n === undefined) break;
           seats.push(n);

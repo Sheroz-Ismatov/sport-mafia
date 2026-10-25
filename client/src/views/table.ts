@@ -1,4 +1,4 @@
-// Круглый стол на 10 мест, общий для игрока и наблюдателя.
+// Круглый стол на 6-10 мест, общий для игрока и наблюдателя.
 
 import type { GameView } from '../../../engine/index.ts';
 import { NIGHT_STEP, clock, esc, isBlackRole, outText, remainingMs, seatPosition, winnerText, ROLE_SHORT } from '../util.ts';
@@ -54,7 +54,7 @@ function centerHtml(game: GameView, offset: number): string {
 export function renderTable(game: GameView, o: TableOptions): string {
   const nominated = new Set(['day', 'voting', 'tieSpeech'].includes(game.phase) ? game.nominations.map((x) => x.target) : []);
   const seats = game.seats.map((s) => {
-    const pos = seatPosition(s.seat);
+    const pos = seatPosition(s.seat, game.seats.length);
     const cls = ['seat'];
     let sub = esc(s.nick);
     if (s.role && isBlackRole(s.role)) {

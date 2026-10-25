@@ -38,5 +38,5 @@ export interface RoomInfo {
 export type ServerMessage =
   | { t: 'welcome'; code: string; token: string }               // токен хранить в localStorage для resume
   | { t: 'state'; now: number; room: RoomInfo; game: GameView | null } // now — время сервера для таймеров; game === null в лобби
-  | { t: 'error'; message: string }
+  | { t: 'error'; message: string; code?: 'room_gone' } // room_gone — вернуться некуда, комнаты больше нет
   | { t: 'closed'; reason: string };

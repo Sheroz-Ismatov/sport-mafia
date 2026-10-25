@@ -2,11 +2,20 @@
 
 import type { Store } from '../store.ts';
 import { esc } from '../util.ts';
+import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
+
+/** «8 игроков: 5 мирных, шериф, дон и мафия» */
+function composition(n: number): string {
+  if (n < MIN_PLAYERS) return `Нужно хотя бы ${MIN_PLAYERS} игроков, сейчас ${n}`;
+  const c = roleCounts(n);
+  const blacks = c.mafia === 1 ? 'дон и мафия' : `дон и ${c.mafia} мафии`;
+  return `${n} игроков: ${c.civilian} мирных, шериф, ${blacks}${n < MAX_PLAYERS ? '. Неполный стол: чёрных двое' : ''}`;
+}
 
 export function renderHome(store: Store): string {
   const joining = store.code !== '';
   return `<div class="screen">
-    <div class="top-left"><span class="eyebrow">Онлайн-стол на 10 игроков</span><h1>Спортивная мафия</h1></div>
+    <div class="top-left"><span class="eyebrow">Онлайн-стол на ${MIN_PLAYERS}-${MAX_PLAYERS} игроков</span><h1>Спортивная мафия</h1></div>
     <div class="field"><label for="nick">Ваш ник</label>
       <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
     <div class="card">
@@ -42,7 +51,7 @@ export function renderLobby(store: Store): string {
 
   return `<div class="screen">
     <div class="top"><div class="top-left"><span class="eyebrow">${room.you.kind === 'host' ? 'Вы ведущий' : room.you.kind === 'spectator' ? 'Вы зритель' : 'Вы игрок'}${room.you.owner && room.you.kind !== 'host' ? ' и создатель комнаты' : ''}</span><h1>Лобби</h1></div>
-      <span class="pill gold">${players.length} из 10</span></div>
+      <span class="pill gold">${players.length} из ${MAX_PLAYERS}</span></div>
     <div class="card accent">
       <span class="eyebrow">Код комнаты</span>
       <span class="code-big">${esc(room.code)}</span>
@@ -52,10 +61,12 @@ export function renderLobby(store: Store): string {
       </div>
     </div>
     ${isHost ? `<div class="stack">
-      <button class="btn primary" data-act="start" ${players.length === 10 ? '' : 'disabled'}>Начать раздачу карт</button>
-      ${players.length < 10 ? `<button class="btn" data-act="addBots">Добрать стол ботами (${10 - players.length})</button>
-      <p class="hint">Боты ходят случайно. Это нужно, чтобы проверить игру, пока не собрались 10 человек.</p>` : ''}
-    </div>` : `<p class="note">Ждём, пока ведущий начнёт игру. Места за столом разыграются случайно.</p>`}
+      <p class="note">${composition(players.length)}</p>
+      <button class="btn primary" data-act="start" ${players.length >= MIN_PLAYERS ? '' : 'disabled'}>Начать раздачу карт</button>
+      ${players.length < MAX_PLAYERS ? `<button class="btn" data-act="addBots">Добрать ботами до ${MAX_PLAYERS} (+${MAX_PLAYERS - players.length})</button>
+      <p class="hint">Играть можно от ${MIN_PLAYERS} человек без ботов. Боты ходят случайно, они нужны для проверки.</p>` : ''}
+    </div>` : `<p class="note">${composition(players.length)}</p>
+      <p class="hint">Ждём, пока создатель комнаты начнёт игру. Места за столом разыграются случайно.</p>`}
     <div class="stack"><h2>Ведущий</h2>${host ? `<div class="members">${item(host)}</div>` : '<p class="hint">Без ведущего: таймеры идут сами, фолов и удалений нет.</p>'}</div>
     <div class="stack"><h2>Игроки</h2><div class="members">${players.map(item).join('') || '<p class="hint">Пока никого</p>'}</div></div>
     ${spectators.length ? `<div class="stack"><h2>Зрители</h2><div class="members">${spectators.map(item).join('')}</div></div>` : ''}

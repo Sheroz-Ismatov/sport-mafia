@@ -51,6 +51,7 @@ export interface GameView {
   myShot: number | null;
   myChecks: CheckResult[];
   bestMoveBy: number | null;                         // кого убили в первую ночь, пока идёт лучший ход
+  bestMoveSize: number;                              // сколько номеров назвать: по числу чёрных
   bestMove: { by: number; seats: number[] } | null;  // открывается всем утром
   winner: Winner | null;
   endReason: string;
@@ -153,6 +154,7 @@ export function viewFor(game: Game, viewer: Viewer): GameView {
     myShot: iAmBlack && game.phase === 'night' ? game.shots[mySeat!.seat] ?? null : null,
     myChecks: [...myChecks],
     bestMoveBy: game.nightStep === 'bestMove' ? game.nightKill : null,
+    bestMoveSize: dealing || !game.seats.length ? 3 : game.bestMoveSize(),
     bestMove,
     winner: game.winner && ended ? game.winner : null,
     endReason: ended ? game.endReason : '',

@@ -67,9 +67,9 @@ function setup() {
   return { g, act, fails, next, timeout, day, vote, lastWords, night, start };
 }
 
-test('раздача: 6 мирных, шериф, дон и 2 мафии; нужно ровно 10 игроков', () => {
+test('раздача на 10: 6 мирных, шериф, дон и 2 мафии; меньше 6 игроков нельзя', () => {
   const g = new Game({}, () => 0.42);
-  assert.equal(g.dispatch(HOST, { type: 'start', players: players.slice(0, 9) }, 0).ok, false);
+  assert.equal(g.dispatch(HOST, { type: 'start', players: players.slice(0, 5) }, 0).ok, false);
   assert.ok(g.dispatch(HOST, { type: 'start', players, instantDeal: true }, 0).ok);
   const count = (r: Role) => g.seats.filter((s) => s.role === r).length;
   assert.deepEqual([count('civilian'), count('sheriff'), count('mafia'), count('don')], [6, 1, 2, 1]);
@@ -376,4 +376,80 @@ test('наблюдатель и чужие игроки не могут дейс
   fails(P(1), { type: 'timeout' }, /сервер/);
   fails(HOST, { type: 'pass' }, /игрока/);
   assert.equal(g.speaker, 1);
+});
+
+test('неполный стол: от 6 до 9 игроков двое чёрных, при 10 — трое', () => {
+  const make = (n: number) => Array.from({ length: n }, (_, i) => ({ playerId: 'q' + i, nick: 'Игрок' + i }));
+  for (const n of [6, 7, 8, 9, 10]) {
+    const g = new Game({}, () => 0.37);
+    assert.ok(g.dispatch(HOST, { type: 'start', players: make(n), instantDeal: true }, 0).ok, `старт на ${n}`);
+    const count = (r: Role) => g.seats.filter((s) => s.role === r).length;
+    const blacks = count('mafia') + count('don');
+    assert.equal(g.seats.length, n);
+    assert.equal(blacks, n === 10 ? 3 : 2, `чёрных при ${n}`);
+    assert.equal(count('don'), 1);
+    assert.equal(count('sheriff'), 1);
+    assert.equal(g.bestMoveSize(), blacks);
+  }
+  for (const n of [5, 11]) {
+    const g = new Game();
+    assert.equal(g.dispatch(HOST, { type: 'start', players: make(n) }, 0).ok, false, `${n} игроков нельзя`);
+  }
+});
+
+test('стол на 7: раздача, речи по кругу из 7, партия доходит до конца', () => {
+  const seven = Array.from({ length: 7 }, (_, i) => ({ playerId: 's' + i, nick: 'Семь' + i }));
+  // №2 дон, №5 мафия, №7 шериф
+  const roles: Role[] = ['civilian', 'don', 'civilian', 'civilian', 'mafia', 'civilian', 'sheriff'];
+  const g = new Game({}, () => 0.5);
+  let now = 0;
+  const ok = (actor: Actor, action: Action) => {
+    const r = g.dispatch(actor, action, (now += 10));
+    assert.ok(r.ok, r.ok ? '' : r.error);
+  };
+  ok(HOST, { type: 'start', players: seven, fixedSeats: true, roles });
+  assert.equal(g.phase, 'deal');
+  for (let i = 0; i < 7; i++) ok(SYS, { type: 'timeout' });
+  assert.equal(g.phase, 'zeroNight');
+  assert.deepEqual(g.seats.map((s) => s.role).sort(), [...roles].sort());
+  ok(SYS, { type: 'timeout' });
+  assert.deepEqual(g.speechQueue, [2, 3, 4, 5, 6, 7]); // №1 уже говорит
+  // День 1: город выгоняет мафию №5
+  while (g.phase === 'day') {
+    const s = g.speaker!;
+    if (s === 1) ok(P(1), { type: 'nominate', target: 5 });
+    if (s === 3) ok(P(3), { type: 'nominate', target: 4 });
+    ok(P(s), { type: 'pass' });
+  }
+  assert.equal(g.phase, 'voting');
+  ok(P(1), { type: 'vote', target: 5 });
+  ok(P(3), { type: 'vote', target: 5 });
+  ok(P(6), { type: 'vote', target: 5 });
+  ok(P(7), { type: 'vote', target: 5 });
+  ok(SYS, { type: 'timeout' });
+  ok(SYS, { type: 'timeout' });
+  while (g.phase === 'lastWord') ok(P(g.speaker!), { type: 'pass' });
+  // Ночь 1: дон стреляет один, лучший ход — два номера
+  ok(P(2), { type: 'shoot', target: 7 });
+  ok(SYS, { type: 'timeout' });
+  ok(SYS, { type: 'timeout' });
+  ok(SYS, { type: 'timeout' });
+  assert.equal(g.nightStep, 'bestMove');
+  assert.equal(viewFor(g, { kind: 'player', seat: 7 }).bestMoveSize, 2);
+  assert.equal(g.dispatch(P(7), { type: 'bestMove', seats: [2, 5, 1] }, ++now).ok, false, 'три номера при двух чёрных нельзя');
+  ok(P(7), { type: 'bestMove', seats: [2, 5] });
+  while (g.phase === 'lastWord') ok(P(g.speaker!), { type: 'pass' });
+  // День 2 начинает №2 — следующий после открывавшего №1
+  assert.equal(g.dayOpener, 2);
+  while (g.phase === 'day') {
+    const s = g.speaker!;
+    if (s === 3) ok(P(3), { type: 'nominate', target: 2 });
+    ok(P(s), { type: 'pass' });
+  }
+  assert.equal(g.phase, 'voting', 'со второго дня голосуется и одна кандидатура');
+  ok(SYS, { type: 'timeout' }); // все голоса уходят в единственного кандидата
+  assert.equal(g.seatOf(2).out?.reason, 'voted');
+  assert.equal(g.winner, 'red');
+  while (g.phase === 'lastWord') ok(P(g.speaker!), { type: 'pass' });
+  assert.equal(g.phase, 'ended');
 });

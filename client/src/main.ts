@@ -43,7 +43,10 @@ function onMessage(msg: ServerMessage): void {
       break;
     }
     case 'error':
-      if (msg.message.includes('вернуться')) forgetSession();
+      if (msg.code === 'room_gone') {
+        forgetSession();
+        store.code = '';
+      }
       toast(msg.message);
       return;
     case 'closed':

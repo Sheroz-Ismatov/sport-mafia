@@ -204,7 +204,7 @@ test('ведущий с ботами: партия доходит до конц�
     host.send({ t: 'create', nick: 'Лео' });
     await waitFor(() => host.code !== '');
     host.send({ t: 'start' });
-    await waitFor(() => host.errors.some((e) => e.includes('из 10')));
+    await waitFor(() => host.errors.some((e) => e.includes('хотя бы 6')));
     host.send({ t: 'addBots' });
     await waitFor(() => host.last?.room.players === 10);
     host.send({ t: 'start' });
@@ -252,6 +252,45 @@ test('комната без ведущего: создатель играет с
     assert.equal(me.last!.room.players, 10);
     me.send({ t: 'start' });
     await waitFor(() => me.game?.phase === 'deal');
+  } finally {
+    await srv.close();
+  }
+});
+
+test('стол на 6 без ботов; 5 мало; после перезапуска комнаты нет', async () => {
+  const srv = await startServer({ port: 0, settings: FAST, gamesFile: null });
+  const url = `ws://localhost:${(srv.server.address() as AddressInfo).port}`;
+  try {
+    const host = new Client(url);
+    await host.open();
+    host.send({ t: 'create', nick: 'Лео' });
+    await waitFor(() => host.code !== '');
+    const players: Client[] = [];
+    for (let i = 0; i < 6; i++) {
+      const c = new Client(url);
+      await c.open();
+      c.onState = autoplay;
+      c.send({ t: 'join', code: host.code, nick: `Ш${i}`, as: 'player' });
+      players.push(c);
+      await waitFor(() => c.last !== null);
+      if (i === 4) {
+        host.send({ t: 'start' });
+        await waitFor(() => host.errors.some((e) => e.includes('хотя бы 6')));
+      }
+    }
+    host.send({ t: 'start' });
+    await waitFor(() => host.game?.phase === 'zeroNight');
+    assert.equal(host.game!.seats.length, 6);
+    assert.equal(host.game!.seats.filter((s) => s.role === 'mafia' || s.role === 'don').length, 2);
+    await waitFor(() => host.game?.phase === 'ended', 60_000);
+
+    // Возвращение в комнату, которой нет (как после перезапуска сервера)
+    const lost = new Client(url);
+    await lost.open();
+    lost.send({ t: 'resume', code: 'MAF-0001', token: 'нет такого' });
+    await waitFor(() => lost.messages.some((m) => m.t === 'error'));
+    const err = lost.messages.find((m) => m.t === 'error') as Extract<ServerMessage, { t: 'error' }>;
+    assert.equal(err.code, 'room_gone');
   } finally {
     await srv.close();
   }

@@ -3,7 +3,7 @@
 // когда истекает timer.endsAt. Номера пунктов в комментариях — правила ФСМ.
 
 import {
-  DEFAULT_SETTINGS, SHERIFF_PHRASES, teamOf,
+  DEFAULT_SETTINGS, MAX_PLAYERS, MIN_PLAYERS, SHERIFF_PHRASES, roleDeck, teamOf,
 } from './types.ts';
 import type {
   Action, ActionResult, Actor, CheckResult, LiftVote, LogAudience, LogEntry, MafiaPlan,
@@ -15,11 +15,6 @@ export class RuleError extends Error {}
 function fail(message: string): never {
   throw new RuleError(message);
 }
-
-const ROLE_DECK: Role[] = [
-  'civilian', 'civilian', 'civilian', 'civilian', 'civilian', 'civilian',
-  'sheriff', 'mafia', 'mafia', 'don',
-];
 
 function shuffle<T>(items: T[], rng: () => number): T[] {
   const a = [...items];
@@ -81,6 +76,7 @@ export class Game {
   endReason = '';
   stagnantNights = 0;     // 7.7: три ночи подряд без выбывших — ничья
   aliveAtLastMorning = 10;
+  size = 10; // сколько мест за столом (6-10)
 
   log: LogEntry[] = [];
 
@@ -176,8 +172,8 @@ export class Game {
   /** Живые места по кругу, начиная с from (включительно). */
   private circleFrom(from: number): number[] {
     const order: number[] = [];
-    for (let i = 0; i < 10; i++) {
-      const n = ((from - 1 + i) % 10) + 1;
+    for (let i = 0; i < this.size; i++) {
+      const n = ((from - 1 + i) % this.size) + 1;
       if (this.seatOf(n).alive) order.push(n);
     }
     return order;
@@ -226,20 +222,23 @@ export class Game {
 
   private start(players: { playerId: string; nick: string }[], fixedSeats: boolean, roles?: Role[], instantDeal = false): void {
     if (this.phase !== 'lobby') fail('Игра уже началась');
-    if (players.length !== 10) fail('Нужно ровно 10 игроков');
-    if (new Set(players.map((p) => p.playerId)).size !== 10) fail('Игроки повторяются');
+    const n = players.length;
+    if (n < MIN_PLAYERS || n > MAX_PLAYERS) fail(`Нужно от ${MIN_PLAYERS} до ${MAX_PLAYERS} игроков`);
+    if (new Set(players.map((p) => p.playerId)).size !== n) fail('Игроки повторяются');
+    this.size = n;
+    this.aliveAtLastMorning = n;
     const order = fixedSeats ? players : shuffle(players, this.rng);
-    const deck = roles ?? shuffle(ROLE_DECK, this.rng);
-    if (deck.length !== 10) fail('Нужно 10 ролей');
+    const deck = roles ?? shuffle(roleDeck(n), this.rng);
+    if (deck.length !== n) fail(`Нужно ${n} ролей`);
     this.deck = [...deck];
-    this.deckTakenBy = Array(10).fill(null);
+    this.deckTakenBy = Array(n).fill(null);
     this.seats = order.map((p, i) => ({
       seat: i + 1, playerId: p.playerId, nick: p.nick, role: 'civilian',
       dealtAt: null, alive: true, fouls: 0, muteNextSpeech: false, out: null,
     }));
 
     if (instantDeal) {
-      for (let i = 0; i < 10; i++) this.takeCard(i + 1, i);
+      for (let i = 0; i < n; i++) this.takeCard(i + 1, i);
       return this.startZeroNight();
     }
     // 4.1.3: игроки по очереди вслепую тянут карту
@@ -262,7 +261,7 @@ export class Game {
     if (this.phase !== 'deal') fail('Раздача уже закончилась');
     if (this.dealTurn !== seat) fail('Сейчас тянет карту другой игрок');
     if (this.seatOf(seat).dealtAt !== null) fail('Вы уже взяли карту');
-    if (!Number.isInteger(index) || index < 0 || index > 9 || this.deckTakenBy[index] !== null) fail('Эту карту уже взяли');
+    if (!Number.isInteger(index) || index < 0 || index >= this.size || this.deckTakenBy[index] !== null) fail('Эту карту уже взяли');
     this.takeCard(seat, index);
   }
 
@@ -273,7 +272,7 @@ export class Game {
       const free = this.deckTakenBy.flatMap((by, i) => (by === null ? [i] : []));
       this.takeCard(seat, free[Math.floor(this.rng() * free.length)]);
     }
-    if (seat < 10) {
+    if (seat < this.size) {
       this.dealTurn = seat + 1;
       return this.startTimer(this.settings.dealTurnMs);
     }
@@ -297,7 +296,7 @@ export class Game {
   private setPlan(seat: number, plan: number[]): void {
     this.requireDonAtZeroNight(seat);
     if (!Array.isArray(plan) || plan.length > 4) fail('План: не больше 4 ночей');
-    if (plan.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) fail('В плане только номера 1-10');
+    if (plan.some((n) => !Number.isInteger(n) || n < 1 || n > this.size)) fail(`В плане только номера 1-${this.size}`);
     if (new Set(plan).size !== plan.length) fail('Номера в плане не повторяются');
     this.mafiaPlan.plan = [...plan];
     this.write(`План отстрела: ${plan.map((n, i) => `ночь ${i + 1} №${n}`).join(', ') || 'пусто'}`, 'black');
@@ -344,7 +343,7 @@ export class Game {
     this.voting = null;
     this.liftVote = null;
     // 4.3.2: первый день открывает №1, каждый следующий — следующий после открывавшего
-    const from = d === 1 ? 1 : (this.dayOpener! % 10) + 1;
+    const from = d === 1 ? 1 : (this.dayOpener! % this.size) + 1;
     const queue = this.circleFrom(from);
     this.dayOpener = queue[0];
     this.speechQueue = queue;
@@ -606,13 +605,19 @@ export class Game {
     fail('Сейчас не ваша проверка');
   }
 
+  /** Сколько номеров в лучшем ходе: столько, сколько чёрных в игре (3 за полным столом). */
+  bestMoveSize(): number {
+    return this.seats.filter((s) => teamOf(s.role) === 'black').length;
+  }
+
   private makeBestMove(seat: number, seats: number[]): void {
     if (this.phase !== 'night' || this.nightStep !== 'bestMove' || seat !== this.nightKill) {
       fail('Лучший ход сейчас не ваш');
     }
     if (this.bestMove) fail('Лучший ход уже сделан'); // 8.3.3
-    if (!Array.isArray(seats) || seats.length < 1 || seats.length > 3) fail('Назовите до трёх номеров');
-    if (seats.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) fail('Только номера 1-10');
+    const max = this.bestMoveSize();
+    if (!Array.isArray(seats) || seats.length < 1 || seats.length > max) fail(`Назовите до ${max} номеров`);
+    if (seats.some((n) => !Number.isInteger(n) || n < 1 || n > this.size)) fail(`Только номера 1-${this.size}`);
     if (new Set(seats).size !== seats.length) fail('Номера не повторяются');
     this.bestMove = { by: seat, seats: [...seats] };
     this.advance();
