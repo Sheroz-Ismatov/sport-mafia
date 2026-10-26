@@ -16,6 +16,7 @@ import { renderProfile } from './views/profile.ts';
 import { preloadCardArt } from './views/cards.ts';
 
 const root = document.getElementById('app')!;
+let explicitResume = false; // человек сам нажал «Вернуться в прежнюю игру»
 
 // Ссылка на другой стол важнее запомненной игры: не возвращаем в старую комнату,
 // а показываем вход в новую и кнопку «Вернуться в прежнюю игру»
@@ -63,8 +64,13 @@ function onMessage(msg: ServerMessage): void {
       return;
     case 'error':
       if (msg.code === 'room_gone') {
+        // Предупреждаем, только если человек сейчас был за столом или сам попросил вернуться.
+        // При обычном входе в игру старый закрытый стол просто забываем.
+        const wasHere = store.room !== null || explicitResume;
+        explicitResume = false;
         forgetSession();
         store.code = '';
+        if (!wasHere) return render();
       }
       toast(msg.message);
       return;
@@ -299,6 +305,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     store.prevSession = null;
     store.session = prev;
     store.code = '';
+    explicitResume = true;
     net.send({ t: 'resume', code: prev.code, token: prev.token });
     render();
   },
