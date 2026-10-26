@@ -12,6 +12,13 @@ import { markTalking, renderVoice } from './views/voice.ts';
 import { VoiceClient } from './voice.ts';
 
 const root = document.getElementById('app')!;
+
+// Ссылка на другой стол важнее запомненной игры: не возвращаем в старую комнату,
+// а показываем вход в новую и кнопку «Вернуться в прежнюю игру»
+if (store.session && store.code && store.code !== store.session.code) {
+  store.prevSession = store.session;
+  store.session = null;
+}
 const voiceRoot = document.getElementById('voice')!;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -30,6 +37,7 @@ function toast(text: string): void {
 function onMessage(msg: ServerMessage): void {
   switch (msg.t) {
     case 'welcome':
+      store.prevSession = null;
       store.session = { code: msg.code, token: msg.token };
       save('mafia.session', store.session);
       history.replaceState(null, '', '/');
@@ -58,6 +66,7 @@ function onMessage(msg: ServerMessage): void {
       return;
     case 'closed':
       forgetSession();
+      store.code = '';
       toast(msg.reason);
       return;
   }
@@ -68,6 +77,7 @@ function forgetSession(): void {
   store.session = null;
   store.room = null;
   store.game = null;
+  store.disbandArmed = false;
   voice.update(null);
   save('mafia.session', null);
 }
@@ -180,6 +190,23 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   },
   addBots: () => net.send({ t: 'addBots' }),
   start: () => net.send({ t: 'start' }),
+  disband: () => {
+    if (!store.disbandArmed) {
+      store.disbandArmed = true;
+      return render();
+    }
+    store.disbandArmed = false;
+    net.send({ t: 'disband' });
+  },
+  backToPrev: () => {
+    const prev = store.prevSession;
+    if (!prev) return;
+    store.prevSession = null;
+    store.session = prev;
+    store.code = '';
+    net.send({ t: 'resume', code: prev.code, token: prev.token });
+    render();
+  },
   leave: () => {
     net.send({ t: 'leave' });
     forgetSession();
@@ -264,10 +291,14 @@ root.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
   if (!el || (el as HTMLButtonElement).disabled) return;
   const name = el.dataset.act!;
-  // Подтверждение удаления и ППК сбрасывается любым другим нажатием
+  // Подтверждение удаления, ППК и роспуска стола сбрасывается любым другим нажатием
   if (name !== 'remove' && name !== 'ppk' && (store.removeArmed !== null || store.ppkArmed !== null)) {
     store.removeArmed = null;
     store.ppkArmed = null;
+    render();
+  }
+  if (name !== 'disband' && store.disbandArmed) {
+    store.disbandArmed = false;
     render();
   }
   handlers[name]?.(el);

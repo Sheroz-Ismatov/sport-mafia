@@ -41,6 +41,7 @@ export class Room {
   game: Game | null = null;
   emptySince: number | null = null;
   ownerToken: string | null = null; // кто создал комнату: начинает игру, добавляет ботов, запускает новую партию
+  closed = false;
 
   private readonly opts: Required<Omit<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>> & Pick<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -106,14 +107,25 @@ export class Room {
 
   disconnect(m: Member): void {
     m.send = null;
-    if (![...this.members.values()].some((x) => x.send && !x.bot)) this.emptySince = this.opts.now();
+    this.checkEmpty();
     this.broadcast();
+  }
+
+  /** Живых людей на связи не осталось: запоминаем с какого времени (сервер закроет комнату через минуту). */
+  private checkEmpty(): void {
+    if (this.emptySince === null && ![...this.members.values()].some((x) => x.send && !x.bot)) this.emptySince = this.opts.now();
+  }
+
+  /** Распустить стол может ведущий или создатель комнаты. */
+  canDisband(m: Member): boolean {
+    return m.kind === 'host' || this.isOwner(m);
   }
 
   /** Выйти из комнаты насовсем. Во время игры место остаётся за игроком. */
   leave(m: Member): void {
     m.send = null;
     if (!this.game && m.kind !== 'host' && !this.isOwner(m)) this.members.delete(m.token);
+    this.checkEmpty();
     this.broadcast();
   }
 
@@ -121,6 +133,7 @@ export class Room {
 
   /** Возвращает текст ошибки или null. */
   handle(m: Member, msg: ClientMessage): string | null {
+    if (this.closed) return 'Комната закрыта';
     try {
       switch (msg.t) {
         case 'addBots': return this.addBots(m);
@@ -314,6 +327,7 @@ export class Room {
   }
 
   broadcast(): void {
+    if (this.closed) return;
     const voice = this.opts.voice;
     if (voice) for (const m of this.members.values()) if (!m.bot) voice.setAllowed(this.code, m.id, this.canSpeak(m));
     for (const m of this.members.values()) {
@@ -328,8 +342,13 @@ export class Room {
   }
 
   close(reason: string): void {
+    if (this.closed) return;
+    this.closed = true;
     this.stopTimers();
     this.opts.voice?.dropRoom(this.code);
-    for (const m of this.members.values()) m.send?.({ t: 'closed', reason });
+    for (const m of this.members.values()) {
+      m.send?.({ t: 'closed', reason });
+      m.send = null;
+    }
   }
 }

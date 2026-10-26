@@ -26,6 +26,8 @@ export interface Store {
   removeArmed: number | null;
   showLog: boolean;
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
+  disbandArmed: boolean; // «Распустить стол» нажато один раз, ждём подтверждения
+  prevSession: Session | null; // запомненная игра, когда открыли ссылку на другой стол
 }
 
 function load<T>(key: string, fallback: T): T {
@@ -66,4 +68,6 @@ export const store: Store = {
   removeArmed: null,
   showLog: false,
   cardHidden: false,
+  disbandArmed: false,
+  prevSession: null,
 };

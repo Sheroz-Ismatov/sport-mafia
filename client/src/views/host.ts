@@ -4,6 +4,7 @@ import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
 import { NIGHT_STEP, ROLE_SHORT, clock, esc, isBlackRole, outText, phaseTitle, remainingMs, winnerText } from '../util.ts';
 import { logCard } from './play.ts';
+import { exitButtons } from './exit.ts';
 
 function controlCard(store: Store, game: GameView): string {
   const left = remainingMs(game, store.offset);
@@ -163,6 +164,6 @@ export function renderHost(store: Store): string {
         ${pane('log', logCard(game, true, false))}
       </div>
     </div>
-    <button class="btn ghost" data-act="leave">Выйти из комнаты</button>
+    ${exitButtons(store)}
   </div>`;
 }

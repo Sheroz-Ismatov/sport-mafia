@@ -296,3 +296,9 @@ body.has-voice .offline { bottom: 76px; }
 .seat.talking { box-shadow: 0 0 0 3px var(--green), 0 0 16px rgba(76, 211, 138, .55); }
 .hseat.talking, .member.talking { box-shadow: inset 0 0 0 2px var(--green); }
 @media (prefers-reduced-motion: reduce) { .voice-state.live.loud svg { animation: none; } }
+
+/* ---------- Выход и роспуск стола ---------- */
+.exit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.exit-row.single { grid-template-columns: 1fr; }
+.voice-nc { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--green-bg); color: var(--green); white-space: nowrap; }
+.voice-nc.weak { background: var(--seat); color: var(--muted); }

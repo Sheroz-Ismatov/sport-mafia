@@ -2,6 +2,7 @@
 
 import type { Store } from '../store.ts';
 import { esc } from '../util.ts';
+import { exitButtons } from './exit.ts';
 import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
 
 /** «8 игроков: 5 мирных, шериф, дон и мафия» */
@@ -28,6 +29,10 @@ export function renderHome(store: Store): string {
       </div>
       <button class="btn primary" data-act="join">Войти</button>
     </div>
+    ${store.prevSession ? `<div class="card">
+      <p class="note">Вы открыли приглашение в комнату ${esc(store.code)}. У вас есть незаконченная игра в ${esc(store.prevSession.code)}.</p>
+      <button class="btn small" data-act="backToPrev">Вернуться в ${esc(store.prevSession.code)}</button>
+    </div>` : ''}
     ${joining ? '' : `<div class="card">
       <h2>Новая комната</h2>
       <button class="btn" data-act="create" data-v="host">Создать и вести игру</button>
@@ -70,6 +75,6 @@ export function renderLobby(store: Store): string {
     <div class="stack"><h2>Ведущий</h2>${host ? `<div class="members">${item(host)}</div>` : '<p class="hint">Без ведущего: таймеры идут сами, фолов и удалений нет.</p>'}</div>
     <div class="stack"><h2>Игроки</h2><div class="members">${players.map(item).join('') || '<p class="hint">Пока никого</p>'}</div></div>
     ${spectators.length ? `<div class="stack"><h2>Зрители</h2><div class="members">${spectators.map(item).join('')}</div></div>` : ''}
-    <button class="btn ghost" data-act="leave">Выйти из комнаты</button>
+    ${exitButtons(store)}
   </div>`;
 }

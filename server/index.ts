@@ -18,22 +18,17 @@ const STATIC_FILES: Record<string, { file: URL; type: string }> = {
   '/index.html': { file: dist('index.html'), type: 'text/html; charset=utf-8' },
   '/app.js': { file: dist('app.js'), type: 'text/javascript; charset=utf-8' },
   '/styles.css': { file: dist('styles.css'), type: 'text/css; charset=utf-8' },
-  // Библиотека голоса LiveKit: ставится через npm install, грузится браузером, только когда включают голос
-  '/vendor/livekit-client.js': {
-    file: new URL('../node_modules/livekit-client/dist/livekit-client.umd.js', import.meta.url),
-    type: 'text/javascript; charset=utf-8',
-  },
 };
 
 export interface ServerOptions extends RoomOptions {
   port?: number;
-  roomIdleMs?: number;     // через сколько удалять комнату, где никого нет
+  roomIdleMs?: number;     // через сколько закрывать комнату, где не осталось живых людей (по умолчанию минута)
   gamesFile?: string | null; // куда дописывать итоги партий (null — не писать)
 }
 
 export function startServer(opts: ServerOptions = {}): Promise<{ server: Server; rooms: Map<string, Room>; close: () => Promise<void> }> {
   const rooms = new Map<string, Room>();
-  const roomIdleMs = opts.roomIdleMs ?? 30 * 60_000;
+  const roomIdleMs = opts.roomIdleMs ?? 60_000;
   const gamesFile = opts.gamesFile === undefined ? 'data/games.jsonl' : opts.gamesFile;
 
   const saveGame = async (room: Room) => {
@@ -70,6 +65,20 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
       return;
     }
     // Страница игры: только файлы из списка, никаких путей с диска от пользователя
+    // Голос: собранные куски LiveKit и Krisp из client/dist/lk/ (только простые имена файлов)
+    const lk = /^\/lk\/([\w.-]+\.js)$/.exec(path);
+    if (lk) {
+      try {
+        const body = await readFile(dist(`lk/${lk[1]}`));
+        // Имена кусков меняются при каждой сборке, кроме lk.js: его не кэшируем
+        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': lk[1] === 'lk.js' ? 'no-cache' : 'public, max-age=604800, immutable' });
+        res.end(body);
+      } catch {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('Голос не собран\n');
+      }
+      return;
+    }
     const file = STATIC_FILES[path === '/' ? '/index.html' : path];
     if (file) {
       try {
@@ -153,6 +162,14 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
         }
 
         if (!room || !member) return error('Сначала войдите в комнату');
+        if (msg.t === 'disband') {
+          if (!room.canDisband(member)) return error('Распустить стол может только ведущий или создатель комнаты');
+          room.close(member.kind === 'host' ? 'Ведущий распустил стол' : `${member.nick} распустил стол`);
+          rooms.delete(room.code);
+          room = null;
+          member = null;
+          return;
+        }
         const problem = room.handle(member, msg);
         if (problem) error(problem);
         if (msg.t === 'leave') {
@@ -169,16 +186,17 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     });
   });
 
-  // Уборка: комнаты, где давно никого нет
+  // Уборка: стол, за которым не осталось живых людей (только боты или никого), закрывается через минуту
   const sweep = setInterval(() => {
     const now = Date.now();
     for (const [code, room] of rooms) {
-      if (room.emptySince !== null && now - room.emptySince > roomIdleMs) {
-        room.close('Комната закрыта: в ней долго никого не было');
+      if (room.closed) rooms.delete(code);
+      else if (room.emptySince !== null && now - room.emptySince > roomIdleMs) {
+        room.close('Стол закрыт: за ним больше минуты не было живых людей');
         rooms.delete(code);
       }
     }
-  }, 60_000);
+  }, Math.min(5_000, roomIdleMs));
 
   return new Promise((resolve) => {
     server.listen(opts.port ?? 8080, () => {

@@ -311,3 +311,70 @@ test('несуществующая комната и мусор вместо JSO
     await srv.close();
   }
 });
+
+test('роспуск стола: только ведущий или создатель, игра заканчивается у всех', async () => {
+  const srv = await startServer({ port: 0, settings: { ...FAST, speechMs: 60_000 }, botDelayMs: [5, 20], gamesFile: null });
+  const url = `ws://localhost:${(srv.server.address() as AddressInfo).port}`;
+  try {
+    const host = new Client(url);
+    await host.open();
+    host.send({ t: 'create', nick: 'Лео' });
+    await waitFor(() => host.code !== '');
+    const anya = new Client(url);
+    await anya.open();
+    anya.send({ t: 'join', code: host.code, nick: 'Аня', as: 'player' });
+    await waitFor(() => anya.last !== null);
+    host.send({ t: 'addBots' });
+    await waitFor(() => host.last?.room.players === 10);
+    host.send({ t: 'start' });
+    await waitFor(() => host.game?.phase === 'deal');
+
+    // Игрок распустить стол не может
+    anya.send({ t: 'disband' });
+    await waitFor(() => anya.errors.some((e) => e.includes('Распустить стол может только')));
+    assert.equal(srv.rooms.has(host.code), true);
+
+    host.send({ t: 'disband' });
+    const closed = (c: Client) => c.messages.find((m) => m.t === 'closed');
+    await waitFor(() => !!closed(anya) && !!closed(host));
+    assert.equal((closed(anya) as { reason: string }).reason, 'Ведущий распустил стол');
+    assert.equal(srv.rooms.has(host.code), false);
+
+    // После роспуска состояние больше не приходит, вернуться некуда
+    const count = anya.messages.length;
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(anya.messages.filter((m) => m.t === 'state').length, anya.messages.slice(0, count).filter((m) => m.t === 'state').length);
+    const back = new Client(url);
+    await back.open();
+    back.send({ t: 'resume', code: anya.code, token: anya.token });
+    await waitFor(() => back.messages.some((m) => m.t === 'error' && m.code === 'room_gone'));
+  } finally {
+    await srv.close();
+  }
+});
+
+test('за столом остались одни боты: стол закрывается сам', async () => {
+  const srv = await startServer({ port: 0, settings: { ...FAST, speechMs: 60_000 }, botDelayMs: [5, 20], gamesFile: null, roomIdleMs: 300 });
+  const url = `ws://localhost:${(srv.server.address() as AddressInfo).port}`;
+  try {
+    const me = new Client(url);
+    await me.open();
+    me.send({ t: 'create', nick: 'Лео', as: 'player' });
+    await waitFor(() => me.code !== '');
+    me.send({ t: 'addBots' });
+    await waitFor(() => me.last?.room.players === 10);
+    me.send({ t: 'start' });
+    await waitFor(() => me.game?.phase === 'deal');
+    const code = me.code;
+
+    // Человек на связи: стол живёт
+    await new Promise((r) => setTimeout(r, 600));
+    assert.equal(srv.rooms.has(code), true);
+
+    // Закрыл вкладку: через минуту (в тесте 0,3 с) стол закрывается
+    me.ws.close();
+    await waitFor(() => !srv.rooms.has(code), 5_000);
+  } finally {
+    await srv.close();
+  }
+});

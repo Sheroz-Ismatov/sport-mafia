@@ -5,7 +5,18 @@
 import type { RoomInfo } from '../../server/protocol.ts';
 
 // Ровно то, чем пользуемся из livekit-client
-interface LkTrack { kind: string; attach(): HTMLMediaElement; detach(): HTMLMediaElement[] }
+interface LkTrack {
+  kind: string;
+  attach(): HTMLMediaElement;
+  detach(): HTMLMediaElement[];
+  setProcessor?(processor: unknown): Promise<void>;
+}
+interface LkPublication { kind?: string; source?: string; track?: LkTrack }
+interface KrispProcessor { setEnabled(on: boolean): Promise<unknown> }
+interface KrispModule {
+  KrispNoiseFilter(opts?: object): KrispProcessor;
+  isKrispNoiseFilterSupported(): boolean;
+}
 interface LkParticipant { identity: string; isSpeaking?: boolean }
 interface LkLocalParticipant extends LkParticipant {
   isMicrophoneEnabled: boolean;
@@ -20,10 +31,9 @@ interface LkRoom {
   disconnect(): Promise<void>;
   startAudio(): Promise<void>;
 }
-interface LkLib { Room: new (opts?: object) => LkRoom }
-
-declare global {
-  interface Window { LivekitClient?: LkLib }
+interface LkLib {
+  Room: new (opts?: object) => LkRoom;
+  loadKrisp: (() => Promise<KrispModule>) | null;
 }
 
 export type VoiceStatus = 'off' | 'loading' | 'connecting' | 'on' | 'error';
@@ -35,21 +45,16 @@ export interface VoiceState {
   selfMuted: boolean;      // человек сам выключил микрофон
   needsTap: boolean;       // браузер не дал включить звук без нажатия
   talking: Set<string>;    // кто сейчас говорит (id участников)
+  noise: 'pending' | 'krisp' | 'browser'; // шумоподавление: Krisp или только встроенное в браузер
 }
 
 let lib: Promise<LkLib> | null = null;
+const LIB_URL = '/lk/lk.js'; // через переменную, чтобы сборщик не пытался вшить файл в app.js
 
 function loadLib(): Promise<LkLib> {
-  if (window.LivekitClient) return Promise.resolve(window.LivekitClient);
-  lib ??= new Promise<LkLib>((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = '/vendor/livekit-client.js';
-    s.onload = () => (window.LivekitClient ? resolve(window.LivekitClient) : reject(new Error('Библиотека голоса не загрузилась')));
-    s.onerror = () => {
-      lib = null;
-      reject(new Error('Не удалось загрузить библиотеку голоса'));
-    };
-    document.head.appendChild(s);
+  lib ??= (import(LIB_URL) as Promise<LkLib>).catch(() => {
+    lib = null;
+    throw new Error('Не удалось загрузить библиотеку голоса');
   });
   return lib;
 }
@@ -63,7 +68,8 @@ function micErrorText(e: unknown): string {
 }
 
 export class VoiceClient {
-  readonly state: VoiceState = { status: 'off', error: null, micOn: false, selfMuted: false, needsTap: false, talking: new Set() };
+  readonly state: VoiceState = { status: 'off', error: null, micOn: false, selfMuted: false, needsTap: false, talking: new Set(), noise: 'pending' };
+  private krispBroken = false; // Krisp не работает в этом браузере или на тарифе: больше не пробуем
   private room: LkRoom | null = null;
   private allowed = false;      // по правилам можно говорить (из состояния сервера)
   private syncing = false;
@@ -117,7 +123,10 @@ export class VoiceClient {
         })
         .on('audioPlaybackChanged', () => this.set({ needsTap: !room.canPlaybackAudio }))
         .on('participantPermissionsChanged', () => this.sync())
-        .on('localTrackPublished', () => this.sync())
+        .on('localTrackPublished', (pub: LkPublication) => {
+          void this.sync();
+          if (pub?.source === 'microphone' && pub.track) void this.applyKrisp(pub.track);
+        })
         .on('localTrackUnpublished', () => this.sync())
         .on('trackMuted', () => this.sync())
         .on('trackUnmuted', () => this.sync())
@@ -139,6 +148,31 @@ export class VoiceClient {
     } catch (e) {
       this.room = null;
       this.set({ status: 'error', error: 'Не удалось подключиться к голосу: ' + ((e as Error).message || 'ошибка сети') });
+    }
+  }
+
+  /**
+   * Шумоподавление Krisp из LiveKit Cloud: убирает шорохи, клавиатуру, фоновые голоса.
+   * Каждый новый трек микрофона (после закрытия и открытия) получает свой фильтр.
+   * Если Krisp недоступен, остаётся встроенное шумоподавление браузера.
+   */
+  private async applyKrisp(track: LkTrack): Promise<void> {
+    if (this.krispBroken || !track.setProcessor) return this.set({ noise: 'browser' });
+    try {
+      const Lk = await loadLib();
+      const krisp = await Lk.loadKrisp?.();
+      if (!krisp || !krisp.isKrispNoiseFilterSupported()) {
+        this.krispBroken = true;
+        return this.set({ noise: 'browser' });
+      }
+      const filter = krisp.KrispNoiseFilter();
+      await track.setProcessor(filter);
+      await filter.setEnabled(true);
+      this.set({ noise: 'krisp' });
+    } catch (e) {
+      console.warn('Krisp не включился, остаётся шумоподавление браузера', e);
+      this.krispBroken = true;
+      this.set({ noise: 'browser' });
     }
   }
 

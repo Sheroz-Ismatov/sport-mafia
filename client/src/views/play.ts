@@ -4,6 +4,7 @@ import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
 import { ROLE_NAME, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
+import { exitButtons } from './exit.ts';
 import { cardBack, flippingCard } from './cards.ts';
 
 export type PickKind = 'plan' | 'nominate' | 'shoot' | 'check' | 'bestMove';
@@ -347,6 +348,6 @@ export function renderPlay(store: Store): string {
     parts.push('<p class="hint">Голос на этом сервере не настроен: для проверки созвонитесь в любом мессенджере.</p>');
   }
   parts.push(logCard(game, store.showLog || game.phase === 'ended'));
-  parts.push('<button class="btn ghost" data-act="leave">Выйти из комнаты</button>');
+  parts.push(exitButtons(store));
   return `<div class="screen">${parts.join('')}</div>`;
 }
