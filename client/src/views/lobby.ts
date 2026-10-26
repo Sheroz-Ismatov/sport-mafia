@@ -18,7 +18,8 @@ function composition(n: number): string {
 export function renderHome(store: Store): string {
   const joining = store.code !== '';
   return `<div class="screen">
-    <div class="top-left"><span class="eyebrow">Онлайн-стол на ${MIN_PLAYERS}-${MAX_PLAYERS} игроков</span><h1>Спортивная мафия</h1></div>
+    <div class="brand"><img src="/img/logo.webp" alt="" width="72" height="72">
+      <div class="top-left"><span class="eyebrow">Онлайн-стол на ${MIN_PLAYERS}-${MAX_PLAYERS} игроков</span><h1>Спортивная мафия</h1></div></div>
     ${accountCard(store)}
     <div class="field"><label for="nick">Ваш ник</label>
       <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
