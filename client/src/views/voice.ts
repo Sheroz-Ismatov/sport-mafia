@@ -26,12 +26,6 @@ function talkingText(room: RoomInfo, v: VoiceState): string {
   return names.length ? `Говорит: ${names.join(', ')}` : '';
 }
 
-function noiseBadge(v: VoiceState): string {
-  if (v.noise === 'krisp') return '<span class="voice-nc" title="Шумоподавление Krisp: шорохи и фон не слышны">без шума</span>';
-  if (v.noise === 'browser') return '<span class="voice-nc weak" title="Krisp недоступен, работает обычное шумоподавление браузера">обычное шумоподавление</span>';
-  return '';
-}
-
 export function renderVoice(room: RoomInfo | null, game: GameView | null, v: VoiceState, canSpeak: boolean): string {
   if (!room?.voice) return '';
   const listener = room.you.kind === 'spectator' || (game !== null && game.phase !== 'ended' && room.you.kind === 'player' && room.you.seat !== null && game.seats[room.you.seat - 1]?.alive === false);
@@ -52,7 +46,7 @@ export function renderVoice(room: RoomInfo | null, game: GameView | null, v: Voi
   if (canSpeak) {
     const host = room.you.kind === 'host';
     if (v.selfMuted) state = `<span class="voice-state muted">${MIC_OFF}<span>Микрофон выключен</span></span>`;
-    else if (v.micOn) state = `<span class="voice-state live${v.talking.has(room.you.id) ? ' loud' : ''}">${MIC}<span>${host ? 'Вас слышат все' : 'Ваше слово, вас слышат'}</span></span>${noiseBadge(v)}`;
+    else if (v.micOn) state = `<span class="voice-state live${v.talking.has(room.you.id) ? ' loud' : ''}">${MIC}<span>${host ? 'Вас слышат все' : 'Ваше слово, вас слышат'}</span></span>`;
     else state = `<span class="voice-state">${MIC}<span>Открываю микрофон…</span></span>`;
     button = `<button class="btn tiny" data-act="voiceMute">${v.selfMuted ? 'Включить микрофон' : 'Выключить'}</button>`;
   } else if (listener) {
