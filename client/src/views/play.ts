@@ -5,6 +5,7 @@ import type { Store } from '../store.ts';
 import { ROLE_NAME, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
 import { exitButtons } from './exit.ts';
+import { finaleCard } from './finale.ts';
 import { cardBack, flippingCard } from './cards.ts';
 
 export type PickKind = 'plan' | 'nominate' | 'shoot' | 'check' | 'bestMove';
@@ -337,9 +338,7 @@ export function renderPlay(store: Store): string {
       parts.push(nightPanel(store, game, mode));
       break;
     case 'ended':
-      parts.push(`<div class="card ended-card"><span class="big">${winnerText(game)}</span><p class="note">${esc(game.endReason)}</p>
-        ${me ? `<p class="hint">Ваша роль: ${ROLE_NAME[me.role]}</p>` : ''}
-        ${store.room?.you.owner ? '<button class="btn primary" data-act="restart">Сыграть ещё раз</button>' : ''}</div>`);
+      parts.push(finaleCard(store, game));
       break;
   }
 

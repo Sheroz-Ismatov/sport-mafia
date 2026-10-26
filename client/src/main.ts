@@ -13,7 +13,8 @@ import { randomQuoteIndex } from './quotes.ts';
 import { pickMode, renderPlay } from './views/play.ts';
 import { markTalking, renderVoice } from './views/voice.ts';
 import { VoiceClient } from './voice.ts';
-import { api, inTelegram, miniAppInitData, mountLoginWidget, parseStartParam, setupMiniApp, shareInTelegram } from './tg.ts';
+import { api, haptic, inTelegram, miniAppInitData, mountLoginWidget, parseStartParam, setBackButton, setupMiniApp, shareInTelegram } from './tg.ts';
+import type { GameView } from '../../engine/index.ts';
 import type { Account } from './tg.ts';
 import { renderProfile } from './views/profile.ts';
 import { preloadCardArt } from './views/cards.ts';
@@ -59,6 +60,7 @@ function onMessage(msg: ServerMessage): void {
       const prev = store.game?.mySeat ? store.game.seats[store.game.mySeat - 1]?.dealtAt ?? null : null;
       // Свою карту только что взяли: когда она перевернётся, обновим плашку с ролью
       if (msg.game?.phase === 'deal' && dealtAt !== null && dealtAt !== prev) setTimeout(render, 1600);
+      feel(store.game, msg.game);
       store.room = msg.room;
       store.game = msg.game;
       voice.update(msg.room);
@@ -86,6 +88,24 @@ function onMessage(msg: ServerMessage): void {
       return;
   }
   render();
+}
+
+/** Вибрация на важных для игрока моментах (только внутри Telegram). */
+function feel(prev: GameView | null, next: GameView | null): void {
+  if (!next) return;
+  const me = next.mySeat;
+  const speech = (g: GameView | null) => !!g && ['day', 'tieSpeech', 'lastWord'].includes(g.phase) && g.speaker === me && me !== null;
+  if (speech(next) && !(speech(prev) && prev!.phase === next.phase)) return haptic('turn');
+  if (next.phase === 'deal' && next.deal?.turn === me && prev?.deal?.turn !== me) return haptic('turn');
+  if (me && next.nominations.some((x) => x.target === me) && !prev?.nominations.some((x) => x.target === me)) return haptic('alert');
+  if (next.phase === 'voting' && prev?.phase !== 'voting') return haptic('tap');
+  if (next.phase === 'night' && prev && (prev.phase !== 'night' || prev.nightStep !== next.nightStep) && pickMode(next)) return haptic('tap');
+  if (next.phase === 'ended' && prev && prev.phase !== 'ended' && me) {
+    const role = next.seats[me - 1]?.role;
+    const black = role === 'mafia' || role === 'don';
+    if (next.winner === 'draw') return haptic('tap');
+    return haptic((next.winner === 'black') === black ? 'win' : 'lose');
+  }
 }
 
 function forgetSession(): void {
@@ -144,7 +164,7 @@ async function loadProfile(): Promise<void> {
 }
 
 async function startAccount(): Promise<void> {
-  setupMiniApp();
+  setupMiniApp(render);
   try {
     store.config = await api.config();
   } catch {
@@ -219,6 +239,11 @@ function render(): void {
   root.innerHTML = html;
 
   renderVoiceBar();
+
+  // Системная кнопка «Назад» в Telegram: закрыть окно, выйти из профиля или правил
+  if (!room && store.sheet) setBackButton(() => handlers.sheetClose(root));
+  else if (!room && store.screen !== 'main') setBackButton(() => { store.screen = 'main'; render(); window.scrollTo(0, 0); });
+  else setBackButton(null);
 
   // Кнопка «Войти через Telegram» на сайте
   const login = root.querySelector<HTMLElement>('#tg-login');

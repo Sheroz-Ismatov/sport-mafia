@@ -24,6 +24,11 @@ interface TgWebApp {
   setBackgroundColor?(color: string): void;
   openTelegramLink(url: string): void;
   disableVerticalSwipes?(): void;
+  HapticFeedback?: {
+    impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
+    notificationOccurred(type: 'error' | 'success' | 'warning'): void;
+  };
+  BackButton?: { show(): void; hide(): void; onClick(fn: () => void): void };
 }
 
 declare global {
@@ -51,7 +56,7 @@ export const inTelegram = miniAppInitData !== null;
 let webApp: TgWebApp | null = null;
 
 /** Подключает Telegram.WebApp: растягивает окно, красит шапку под тему игры. */
-export function setupMiniApp(): void {
+export function setupMiniApp(onReady?: () => void): void {
   if (!inTelegram) return;
   const s = document.createElement('script');
   s.src = 'https://telegram.org/js/telegram-web-app.js';
@@ -63,8 +68,37 @@ export function setupMiniApp(): void {
     webApp.setHeaderColor?.('#0E1014');
     webApp.setBackgroundColor?.('#0E1014');
     webApp.disableVerticalSwipes?.(); // свайп вниз не закрывает игру посреди партии
+    webApp.BackButton?.onClick(() => backHandler?.());
+    onReady?.();
   };
   document.head.appendChild(s);
+}
+
+/** Лёгкая вибрация в Telegram: твоя минута, тебя выставили, голосование, конец партии. */
+export function haptic(kind: 'turn' | 'alert' | 'tap' | 'win' | 'lose'): void {
+  const h = webApp?.HapticFeedback;
+  if (!h) return;
+  try {
+    if (kind === 'turn') h.impactOccurred('heavy');
+    else if (kind === 'tap') h.impactOccurred('light');
+    else if (kind === 'alert') h.notificationOccurred('warning');
+    else h.notificationOccurred(kind === 'win' ? 'success' : 'error');
+  } catch {
+    // старая версия Telegram: без вибрации
+  }
+}
+
+let backHandler: (() => void) | null = null;
+let backShown = false;
+
+/** Системная кнопка «Назад» в шапке Telegram (вместо поиска кнопки внизу страницы). */
+export function setBackButton(onBack: (() => void) | null): void {
+  backHandler = onBack;
+  const bb = webApp?.BackButton;
+  if (!bb) return;
+  if (onBack && !backShown) bb.show();
+  if (!onBack && backShown) bb.hide();
+  backShown = !!onBack;
 }
 
 /** Поделиться ссылкой через окно выбора чата Telegram. */

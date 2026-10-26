@@ -5,6 +5,7 @@ import type { Store } from '../store.ts';
 import { NIGHT_STEP, ROLE_SHORT, clock, esc, isBlackRole, outText, phaseTitle, remainingMs, winnerText } from '../util.ts';
 import { logCard } from './play.ts';
 import { exitButtons } from './exit.ts';
+import { finaleCard } from './finale.ts';
 
 function controlCard(store: Store, game: GameView): string {
   const left = remainingMs(game, store.offset);
@@ -60,8 +61,7 @@ function controlCard(store: Store, game: GameView): string {
       next = 'Следующий шаг';
       break;
     case 'ended':
-      return `<div class="card ended-card"><span class="big">${winnerText(game)}</span><p class="note">${esc(game.endReason)}</p>
-        ${store.room?.you.owner ? '<button class="btn primary" data-act="restart">Сыграть ещё раз</button>' : ''}</div>`;
+      return finaleCard(store, game);
   }
 
   return `<div class="card accent">
