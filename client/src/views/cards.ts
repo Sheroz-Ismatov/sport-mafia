@@ -29,11 +29,11 @@ export function cardFace(role: Role): string {
 
 /** Заранее загружаем рисунки, чтобы карта перевернулась уже с картинкой. */
 export function preloadCardArt(): void {
-  for (const r of ['civilian', 'sheriff', 'mafia', 'don']) new Image().src = `/img/${r}.webp`;
+  for (const r of ['back', 'civilian', 'sheriff', 'mafia', 'don']) new Image().src = `/img/${r}.webp`;
 }
 
 export function cardBack(): string {
-  return '<div class="pcard back"><span class="emblem">М</span></div>';
+  return '<div class="pcard back art"><img src="/img/back.webp" alt="" draggable="false"></div>';
 }
 
 /**
