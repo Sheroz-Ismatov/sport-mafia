@@ -1,4 +1,4 @@
-// Игровые карты: рубашка и лицо с рисунком роли. Рисунки — простые SVG, без картинок из сети.
+// Игровые карты: рубашка и лицо с рисунком роли (котики-мафиози, client/src/img). Маленькие значки ролей — SVG.
 
 import type { Role } from '../../../engine/index.ts';
 import { ROLE_NAME } from '../util.ts';
@@ -20,12 +20,16 @@ export function roleIcon(role: Role, size = 64): string {
 
 export function cardFace(role: Role): string {
   const team = role === 'mafia' || role === 'don' ? 'Чёрные' : 'Красные';
-  return `<div class="pcard face c-${role}">
+  return `<div class="pcard face art c-${role}">
+    <img src="/img/${role}.webp" alt="" draggable="false">
     <span class="corner">${roleIcon(role, 18)}</span>
-    ${roleIcon(role, 88)}
-    <b>${ROLE_NAME[role]}</b>
-    <small>${team}</small>
+    <span class="caption"><b>${ROLE_NAME[role]}</b><small>${team}</small></span>
   </div>`;
+}
+
+/** Заранее загружаем рисунки, чтобы карта перевернулась уже с картинкой. */
+export function preloadCardArt(): void {
+  for (const r of ['civilian', 'sheriff', 'mafia', 'don']) new Image().src = `/img/${r}.webp`;
 }
 
 export function cardBack(): string {

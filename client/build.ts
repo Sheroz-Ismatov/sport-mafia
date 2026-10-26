@@ -2,13 +2,15 @@
 
 import { build, context } from 'esbuild';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const dist = new URL('./dist/', import.meta.url);
 await mkdir(dist, { recursive: true });
 await copyFile(new URL('./src/index.html', import.meta.url), new URL('index.html', dist));
 await copyFile(new URL('./src/styles.css', import.meta.url), new URL('styles.css', dist));
+// Рисунки карт
+await cp(new URL('./src/img/', import.meta.url), new URL('img/', dist), { recursive: true });
 
 const options = {
   entryPoints: [fileURLToPath(new URL('./src/main.ts', import.meta.url))],

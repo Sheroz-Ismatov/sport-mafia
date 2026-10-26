@@ -13,6 +13,7 @@ import { VoiceClient } from './voice.ts';
 import { api, inTelegram, miniAppInitData, mountLoginWidget, parseStartParam, setupMiniApp, shareInTelegram } from './tg.ts';
 import type { Account } from './tg.ts';
 import { renderProfile } from './views/profile.ts';
+import { preloadCardArt } from './views/cards.ts';
 
 const root = document.getElementById('app')!;
 
@@ -425,3 +426,4 @@ root.addEventListener('keydown', (e) => {
 render();
 net.connect();
 void startAccount();
+preloadCardArt();

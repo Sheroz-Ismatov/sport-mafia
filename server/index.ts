@@ -169,6 +169,19 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
       return;
     }
     // Страница игры: только файлы из списка, никаких путей с диска от пользователя
+    // Рисунки карт (только простые имена файлов)
+    const img = /^\/img\/([\w-]+\.(webp|png))$/.exec(path);
+    if (img) {
+      try {
+        const body = await readFile(dist(`img/${img[1]}`));
+        res.writeHead(200, { 'content-type': img[2] === 'png' ? 'image/png' : 'image/webp', 'cache-control': 'public, max-age=86400' });
+        res.end(body);
+      } catch {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('Не найдено\n');
+      }
+      return;
+    }
     // Голос: собранные куски LiveKit и Krisp из client/dist/lk/ (только простые имена файлов)
     const lk = /^\/lk\/([\w.-]+\.js)$/.exec(path);
     if (lk) {
