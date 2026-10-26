@@ -300,3 +300,21 @@ body.has-voice .offline { bottom: 76px; }
 /* ---------- Выход и роспуск стола ---------- */
 .exit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .exit-row.single { grid-template-columns: 1fr; }
+
+/* ---------- Аккаунт и профиль ---------- */
+.avatar { position: relative; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--blue-bg); color: var(--blue-soft); font-family: var(--display); font-weight: 700; }
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.account-row { display: flex; align-items: center; gap: 12px; }
+.account-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.account-who b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-who small { color: var(--muted); font-size: 12px; }
+.tg-login { min-height: 44px; }
+.stat-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat-big > div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.stat-big b { font-family: var(--display); font-size: 24px; }
+.stat-big small, .role-stat small { color: var(--muted); font-size: 12px; }
+.role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.role-stat { background: var(--seat); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; }
+.role-stat b { font-family: var(--display); font-size: 20px; }
+.row .v.win { color: var(--green); }
+.screen > .top-left { flex: none; }

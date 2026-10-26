@@ -6,8 +6,8 @@ export type MemberKind = 'host' | 'player' | 'spectator';
 
 /** Браузер → сервер */
 export type ClientMessage =
-  | { t: 'create'; nick: string; as?: 'host' | 'player' }                 // создать комнату: вести игру или играть самому (тогда без ведущего)
-  | { t: 'join'; code: string; nick: string; as: 'player' | 'spectator' } // войти по коду
+  | { t: 'create'; nick: string; as?: 'host' | 'player'; session?: string } // создать комнату: вести игру или играть самому (тогда без ведущего)
+  | { t: 'join'; code: string; nick: string; as: 'player' | 'spectator'; session?: string } // войти по коду; session — вход через Telegram
   | { t: 'resume'; code: string; token: string }                          // вернуться после обрыва связи
   | { t: 'addBots' }                                                      // создатель: добрать стол ботами (для проверки)
   | { t: 'start' }                                                        // создатель: раздать карты
@@ -36,6 +36,20 @@ export interface RoomInfo {
   members: MemberInfo[];
   players: number;     // сколько игроков за столом (нужно 10)
   spectators: number;
+}
+
+/** Ответы HTTP API */
+export interface ApiUser {
+  id: number;
+  firstName: string;
+  lastName: string | null;
+  username: string | null;
+  photoUrl: string | null;
+}
+
+export interface ApiConfig {
+  telegram: { bot: string; app: string | null } | null; // бот для входа и ссылок t.me
+  accounts: boolean;                                     // вход и статистика работают (есть бот и база)
 }
 
 /** Сервер → браузер */

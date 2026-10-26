@@ -10,6 +10,9 @@ import { renderHome, renderLobby } from './views/lobby.ts';
 import { pickMode, renderPlay } from './views/play.ts';
 import { markTalking, renderVoice } from './views/voice.ts';
 import { VoiceClient } from './voice.ts';
+import { api, inTelegram, miniAppInitData, mountLoginWidget, parseStartParam, setupMiniApp, shareInTelegram } from './tg.ts';
+import type { Account } from './tg.ts';
+import { renderProfile } from './views/profile.ts';
 
 const root = document.getElementById('app')!;
 
@@ -88,7 +91,67 @@ const net = new Net(onMessage, (online) => {
   render();
 }, () => {
   if (store.session) net.send({ t: 'resume', code: store.session.code, token: store.session.token });
+  else maybeAutoJoin();
 });
+
+// ---------- Аккаунт ----------
+
+function setAccount(acc: Account | null): void {
+  store.account = acc;
+  if (!inTelegram) save('mafia.account', acc);
+  if (acc && !store.nick.trim()) store.nick = acc.user.firstName.slice(0, 24);
+}
+
+/** Открыли приглашение в Telegram: садимся за стол сразу, как только есть связь и вход проверен. */
+function maybeAutoJoin(): void {
+  if (!store.autoJoin || store.authPending || !store.online || store.room || store.session) return;
+  if (!store.code || !store.nick.trim()) return;
+  store.autoJoin = false;
+  net.send({ t: 'join', code: store.code, nick: store.nick, as: store.joinAs, session: store.account?.session });
+}
+
+async function loadProfile(): Promise<void> {
+  const acc = store.account;
+  if (!acc) return;
+  store.profile = { stats: store.profile.stats, error: null, loading: true };
+  render();
+  try {
+    const me = await api.me(acc.session);
+    store.account = { ...acc, user: me.user };
+    store.profile = { stats: me.stats, error: null, loading: false };
+  } catch (e) {
+    if ((e as { status?: number }).status === 401) {
+      setAccount(null);
+      store.screen = 'main';
+      toast('Войдите заново');
+      return;
+    }
+    store.profile = { stats: null, error: (e as Error).message || 'Нет связи с сервером', loading: false };
+  }
+  render();
+}
+
+async function startAccount(): Promise<void> {
+  setupMiniApp();
+  try {
+    store.config = await api.config();
+  } catch {
+    store.config = null;
+  }
+  if (inTelegram && miniAppInitData && store.config?.accounts) {
+    try {
+      const r = await api.authMiniApp(miniAppInitData);
+      setAccount({ session: r.session, user: r.user });
+      const invite = parseStartParam(r.startParam);
+      if (invite && !store.room) store.code = invite.code;
+    } catch (e) {
+      console.warn('Вход через Telegram не прошёл', e);
+    }
+  }
+  store.authPending = false;
+  render();
+  maybeAutoJoin();
+}
 
 // Голос перерисовывает только свою плашку и подсветку мест: он меняется часто
 const voice = new VoiceClient((msg) => net.send(msg), () => renderVoiceBar());
@@ -123,7 +186,8 @@ function render(): void {
   const room = store.room;
   const game = store.game;
   let html: string;
-  if (!room) html = renderHome(store);
+  if (!room && store.screen === 'profile' && store.account) html = renderProfile(store);
+  else if (!room) html = renderHome(store);
   else if (!game) html = renderLobby(store);
   else if (room.you.kind === 'host') html = renderHost(store);
   else html = renderPlay(store);
@@ -140,6 +204,20 @@ function render(): void {
   root.innerHTML = html;
 
   renderVoiceBar();
+
+  // Кнопка «Войти через Telegram» на сайте
+  const login = root.querySelector<HTMLElement>('#tg-login');
+  const bot = store.config?.telegram?.bot;
+  if (login && bot) {
+    mountLoginWidget(login, bot, (user) => {
+      api.authWidget(user)
+        .then((acc) => {
+          setAccount({ session: acc.session, user: acc.user });
+          toast(`Вы вошли как ${acc.user.firstName}`);
+        })
+        .catch((e: Error) => toast(e.message));
+    });
+  }
 
   if (focusModel) {
     const input = root.querySelector<HTMLInputElement>(`[data-model="${focusModel}"]`);
@@ -169,7 +247,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; render(); },
   create: (el) => {
     if (!store.nick.trim()) return toast('Введите ник');
-    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host' });
+    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session });
   },
   restart: () => net.send({ t: 'restart' }),
   card: (el) => act({ type: 'pickCard', index: num(el) }),
@@ -177,7 +255,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   join: () => {
     if (!store.nick.trim()) return toast('Введите ник');
     if (!store.code.trim()) return toast('Введите код комнаты');
-    net.send({ t: 'join', code: store.code.trim().toUpperCase(), nick: store.nick, as: store.joinAs });
+    net.send({ t: 'join', code: store.code.trim().toUpperCase(), nick: store.nick, as: store.joinAs, session: store.account?.session });
   },
   copyLink: async (el) => {
     const link = el.dataset.v ?? '';
@@ -187,6 +265,22 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     } catch {
       toast(link);
     }
+  },
+  invite: (el) => {
+    const link = el.dataset.v ?? '';
+    if (inTelegram && shareInTelegram(link, 'Садись за стол: спортивная мафия')) return;
+    handlers.copyLink(el);
+  },
+  profile: () => {
+    store.screen = 'profile';
+    void loadProfile();
+  },
+  profileBack: () => { store.screen = 'main'; render(); },
+  logout: () => {
+    setAccount(null);
+    store.screen = 'main';
+    store.profile = { stats: null, error: null, loading: false };
+    render();
   },
   addBots: () => net.send({ t: 'addBots' }),
   start: () => net.send({ t: 'start' }),
@@ -330,3 +424,4 @@ root.addEventListener('keydown', (e) => {
 
 render();
 net.connect();
+void startAccount();

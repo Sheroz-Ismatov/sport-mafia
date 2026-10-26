@@ -14,6 +14,7 @@ export interface Member {
   nick: string;
   kind: MemberKind;
   bot: boolean;
+  userId: number | null; // аккаунт Telegram (null — гость или бот)
   send: ((msg: ServerMessage) => void) | null; // null — сейчас не на связи
 }
 
@@ -42,6 +43,7 @@ export class Room {
   emptySince: number | null = null;
   ownerToken: string | null = null; // кто создал комнату: начинает игру, добавляет ботов, запускает новую партию
   closed = false;
+  gameStartedAt: Date | null = null;
 
   private readonly opts: Required<Omit<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>> & Pick<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -63,7 +65,7 @@ export class Room {
 
   // ---------- Участники ----------
 
-  addMember(rawNick: unknown, kind: MemberKind, bot = false): Member {
+  addMember(rawNick: unknown, kind: MemberKind, bot = false, userId: number | null = null): Member {
     let nick = cleanNick(rawNick);
     const taken = new Set([...this.members.values()].map((m) => m.nick.toLowerCase()));
     for (let i = 2; taken.has(nick.toLowerCase()); i++) nick = `${cleanNick(rawNick).slice(0, MAX_NICK - 3)} ${i}`;
@@ -73,9 +75,14 @@ export class Room {
     if (kind === 'spectator' && this.spectators().length >= this.opts.maxSpectators) {
       throw new Error('В комнате нет мест для зрителей');
     }
-    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, send: null };
+    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, userId, send: null };
     this.members.set(member.token, member);
     return member;
+  }
+
+  /** Участник с этим аккаунтом уже в комнате (зашёл с другого устройства). */
+  memberOfUser(userId: number | null): Member | undefined {
+    return userId === null ? undefined : [...this.members.values()].find((m) => m.userId === userId && !m.bot);
   }
 
   host(): Member | undefined {
@@ -201,6 +208,7 @@ export class Room {
     }, this.opts.now());
     if (!r.ok) return r.error;
     this.game = game;
+    this.gameStartedAt = new Date(this.opts.now());
     this.afterChange();
     return null;
   }

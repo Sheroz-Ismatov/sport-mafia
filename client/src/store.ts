@@ -1,7 +1,9 @@
 // Всё состояние интерфейса в одном месте. Любое изменение → render().
 
 import type { GameView } from '../../engine/index.ts';
-import type { RoomInfo } from '../../server/protocol.ts';
+import type { ApiConfig, RoomInfo } from '../../server/protocol.ts';
+import type { Account, Stats } from './tg.ts';
+import { miniAppInitData, parseStartParam } from './tg.ts';
 
 export interface Session { code: string; token: string }
 
@@ -28,6 +30,13 @@ export interface Store {
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
   disbandArmed: boolean; // «Распустить стол» нажато один раз, ждём подтверждения
   prevSession: Session | null; // запомненная игра, когда открыли ссылку на другой стол
+  // аккаунт
+  config: ApiConfig | null;      // что умеет сервер: Telegram, статистика
+  account: Account | null;       // вошёл через Telegram
+  authPending: boolean;          // внутри Telegram ждём проверки входа
+  autoJoin: boolean;             // открыли приглашение в Telegram: сесть за стол сразу
+  screen: 'main' | 'profile';
+  profile: { stats: Stats | null; error: string | null; loading: boolean };
 }
 
 function load<T>(key: string, fallback: T): T {
@@ -50,6 +59,18 @@ export function save(key: string, value: unknown): void {
 
 const params = new URLSearchParams(location.search);
 
+// Внутри Telegram: ник и приглашение берём из данных запуска (подпись проверит сервер)
+const tgLaunch = (() => {
+  if (!miniAppInitData) return null;
+  try {
+    const p = new URLSearchParams(miniAppInitData);
+    const user = JSON.parse(p.get('user') ?? '{}') as { first_name?: string };
+    return { name: (user.first_name ?? '').slice(0, 24), invite: parseStartParam(p.get('start_param')) };
+  } catch {
+    return null;
+  }
+})();
+
 export const store: Store = {
   online: false,
   everConnected: false,
@@ -58,9 +79,9 @@ export const store: Store = {
   game: null,
   offset: 0,
   toast: null,
-  nick: load<string>('mafia.nick', ''),
-  code: (params.get('room') ?? '').toUpperCase(),
-  joinAs: params.get('as') === 'spectator' ? 'spectator' : 'player',
+  nick: load<string>('mafia.nick', '') || tgLaunch?.name || '',
+  code: tgLaunch?.invite?.code ?? (params.get('room') ?? '').toUpperCase(),
+  joinAs: tgLaunch?.invite ? (tgLaunch.invite.spectator ? 'spectator' : 'player') : params.get('as') === 'spectator' ? 'spectator' : 'player',
   selected: [],
   selectKey: '',
   hostTab: 'table',
@@ -70,4 +91,10 @@ export const store: Store = {
   cardHidden: false,
   disbandArmed: false,
   prevSession: null,
+  config: null,
+  account: miniAppInitData ? null : load<Account | null>('mafia.account', null),
+  authPending: miniAppInitData !== null,
+  autoJoin: !!tgLaunch?.invite,
+  screen: 'main',
+  profile: { stats: null, error: null, loading: false },
 };

@@ -11,6 +11,12 @@ import { DEFAULT_SETTINGS, teamOf } from '../engine/index.ts';
 import { Room } from './room.ts';
 import type { Member, RoomOptions } from './room.ts';
 import { Voice, voiceConfigFromEnv } from './voice.ts';
+import { readSession, signSession, telegramConfigFromEnv, verifyInitData, verifyLoginWidget } from './auth.ts';
+import type { TelegramConfig } from './auth.ts';
+import { PgDb } from './db.ts';
+import type { Db, User } from './db.ts';
+import type { ApiConfig, ApiUser } from './protocol.ts';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ClientMessage, ServerMessage } from './protocol.ts';
 
 const dist = (name: string) => new URL(`../client/dist/${name}`, import.meta.url);
@@ -24,6 +30,37 @@ export interface ServerOptions extends RoomOptions {
   port?: number;
   roomIdleMs?: number;     // через сколько закрывать комнату, где не осталось живых людей (по умолчанию минута)
   gamesFile?: string | null; // куда дописывать итоги партий (null — не писать)
+  telegram?: TelegramConfig | null; // вход через Telegram
+  db?: Db | null;                   // база игроков и партий
+}
+
+const apiUser = (u: User): ApiUser => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, username: u.username, photoUrl: u.photoUrl });
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
+
+function readJson(req: IncomingMessage, limit = 16 * 1024): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error('Слишком большой запрос'));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString() || '{}'));
+      } catch {
+        reject(new Error('Неверный JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 export function startServer(opts: ServerOptions = {}): Promise<{ server: Server; rooms: Map<string, Room>; close: () => Promise<void> }> {
@@ -31,9 +68,33 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
   const roomIdleMs = opts.roomIdleMs ?? 60_000;
   const gamesFile = opts.gamesFile === undefined ? 'data/games.jsonl' : opts.gamesFile;
 
+  const telegram = opts.telegram ?? null;
+  const db = opts.db ?? null;
+  const userOf = (session: unknown): number | null => (telegram && db ? readSession(session, telegram.botToken) : null);
+
   const saveGame = async (room: Room) => {
     const g = room.game;
-    if (!g || !gamesFile) return;
+    if (!g) return;
+    if (db) {
+      const byId = new Map([...room.members.values()].map((m) => [m.id, m]));
+      await db.saveGame({
+        room: room.code,
+        startedAt: room.gameStartedAt,
+        winner: g.winner ?? 'draw',
+        reason: g.endReason,
+        hostUserId: room.host()?.userId ?? null,
+        bots: g.seats.filter((s) => byId.get(s.playerId)?.bot).length,
+        log: g.log.map(({ day, night, text }) => ({ day, night, text })),
+        players: g.seats.map((s) => {
+          const m = byId.get(s.playerId);
+          return {
+            seat: s.seat, userId: m?.userId ?? null, nick: s.nick, bot: !!m?.bot, role: s.role!,
+            won: g.winner !== 'draw' && teamOf(s.role) === g.winner, fouls: s.fouls, out: s.out?.reason ?? null,
+          };
+        }),
+      });
+    }
+    if (!gamesFile) return;
     const record = {
       room: room.code,
       endedAt: new Date().toISOString(),
@@ -50,6 +111,41 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     await appendFile(gamesFile, JSON.stringify(record) + '\n');
   };
 
+  // ---------- HTTP API: вход и профиль ----------
+  const api = async (req: IncomingMessage, res: ServerResponse, path: string) => {
+    if (path === '/api/config' && req.method === 'GET') {
+      const body: ApiConfig = {
+        telegram: telegram ? { bot: telegram.botUsername, app: telegram.appName } : null,
+        accounts: !!(telegram && db),
+      };
+      return sendJson(res, 200, body);
+    }
+    if (!telegram || !db) return sendJson(res, 503, { error: 'Аккаунты на сервере не настроены' });
+
+    if (path === '/api/auth' && req.method === 'POST') {
+      const body = await readJson(req);
+      let startParam: string | null = null;
+      let tg;
+      if (typeof body.initData === 'string') {
+        const r = verifyInitData(body.initData, telegram.botToken);
+        tg = r.user;
+        startParam = r.startParam;
+      } else if (body.widget && typeof body.widget === 'object') {
+        tg = verifyLoginWidget(body.widget, telegram.botToken);
+      } else return sendJson(res, 400, { error: 'Нет данных Telegram' });
+      const user = await db.upsertUser(tg);
+      return sendJson(res, 200, { session: signSession(user.id, telegram.botToken), user: apiUser(user), startParam });
+    }
+
+    if (path === '/api/me' && req.method === 'GET') {
+      const userId = readSession((req.headers.authorization ?? '').replace(/^Bearer /, ''), telegram.botToken);
+      const user = userId === null ? null : await db.getUser(userId);
+      if (!user) return sendJson(res, 401, { error: 'Войдите заново' });
+      return sendJson(res, 200, { user: apiUser(user), stats: await db.stats(user.id) });
+    }
+    sendJson(res, 404, { error: 'Не найдено' });
+  };
+
   const newCode = (): string => {
     for (;;) {
       const code = 'MAF-' + String(Math.floor(1000 + Math.random() * 9000));
@@ -62,6 +158,14 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     if (path === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
+      return;
+    }
+    if (path.startsWith('/api/')) {
+      try {
+        await api(req, res, path);
+      } catch (e) {
+        sendJson(res, 400, { error: e instanceof Error ? e.message : 'Ошибка' });
+      }
       return;
     }
     // Страница игры: только файлы из списка, никаких путей с диска от пользователя
@@ -137,7 +241,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
           if (msg.t === 'create') {
             room = new Room(newCode(), { ...opts, onGameEnd: (r) => { saveGame(r).catch((e) => console.error('Не удалось сохранить партию', e)); } });
             rooms.set(room.code, room);
-            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host');
+            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userOf(msg.session));
             room.ownerToken = member.token;
           } else {
             const found = rooms.get(String(msg.code ?? '').trim().toUpperCase());
@@ -149,7 +253,9 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
               return error('Комната не найдена');
             }
             if (msg.t === 'join') {
-              member = found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player');
+              // Тот же аккаунт уже в комнате (например, зашёл с телефона вместо ноутбука): возвращаем на своё место
+              const userId = userOf(msg.session);
+              member = found.memberOfUser(userId) ?? found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player', false, userId);
             } else {
               member = found.members.get(String(msg.token)) ?? null;
               if (!member || member.bot) {
@@ -227,7 +333,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     ? Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([k, v]) => [k, Math.round(v * scale)]))
     : undefined;
   const voiceCfg = voiceConfigFromEnv();
-  startServer({ port, settings, voice: voiceCfg ? new Voice(voiceCfg) : null }).then(() => {
+  const telegram = telegramConfigFromEnv();
+  let db: Db | null = null;
+  if (process.env.DATABASE_URL) {
+    try {
+      db = await PgDb.connect(process.env.DATABASE_URL);
+      console.log('База данных подключена');
+    } catch (e) {
+      console.error('Не удалось подключиться к базе, статистика не сохраняется', e);
+    }
+  }
+  console.log(telegram ? `Telegram: @${telegram.botUsername}${telegram.appName ? `/${telegram.appName}` : ''}` : 'Вход через Telegram выключен: не заданы TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_USERNAME');
+  startServer({ port, settings, voice: voiceCfg ? new Voice(voiceCfg) : null, telegram, db }).then(() => {
     console.log(`Сервер спортивной мафии: http://localhost:${port}${settings ? ` (таймеры ×${scale})` : ''}`);
     console.log(voiceCfg ? `Голос: ${voiceCfg.url}` : 'Голос выключен: не заданы LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET');
   });

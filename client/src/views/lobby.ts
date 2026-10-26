@@ -3,6 +3,8 @@
 import type { Store } from '../store.ts';
 import { esc } from '../util.ts';
 import { exitButtons } from './exit.ts';
+import { accountCard } from './profile.ts';
+import { inTelegram, telegramLink } from '../tg.ts';
 import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
 
 /** «8 игроков: 5 мирных, шериф, дон и мафия» */
@@ -17,6 +19,7 @@ export function renderHome(store: Store): string {
   const joining = store.code !== '';
   return `<div class="screen">
     <div class="top-left"><span class="eyebrow">Онлайн-стол на ${MIN_PLAYERS}-${MAX_PLAYERS} игроков</span><h1>Спортивная мафия</h1></div>
+    ${accountCard(store)}
     <div class="field"><label for="nick">Ваш ник</label>
       <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
     <div class="card">
@@ -47,6 +50,7 @@ export function renderLobby(store: Store): string {
   const room = store.room!;
   const isHost = room.you.owner;
   const link = `${location.origin}/?room=${encodeURIComponent(room.code)}`;
+  const tgLink = telegramLink(store.config, room.code);
   const players = room.members.filter((m) => m.kind === 'player');
   const spectators = room.members.filter((m) => m.kind === 'spectator');
   const host = room.members.find((m) => m.kind === 'host');
@@ -60,10 +64,14 @@ export function renderLobby(store: Store): string {
     <div class="card accent">
       <span class="eyebrow">Код комнаты</span>
       <span class="code-big">${esc(room.code)}</span>
-      <div class="grid2">
+      ${tgLink ? `<div class="grid2">
+        <button class="btn small primary" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать в Telegram' : 'Ссылка в Telegram'}</button>
+        <button class="btn small" data-act="invite" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
+      </div>
+      <button class="btn small ghost" data-act="copyLink" data-v="${esc(link)}">Ссылка для браузера</button>` : `<div class="grid2">
         <button class="btn small" data-act="copyLink" data-v="${esc(link)}">Скопировать ссылку</button>
         <button class="btn small" data-act="copyLink" data-v="${esc(link + '&as=spectator')}">Ссылка для зрителей</button>
-      </div>
+      </div>`}
     </div>
     ${isHost ? `<div class="stack">
       <p class="note">${composition(players.length)}</p>
