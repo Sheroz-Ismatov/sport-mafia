@@ -20,6 +20,11 @@ export function avatar(u: Pick<ApiUser, 'firstName' | 'photoUrl'>, size = 44): s
   return `<span class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px" aria-hidden="true">${letter}${img}</span>`;
 }
 
+/** Аватарка участника стола: фото из Telegram или первая буква ника. */
+export function memberAvatar(m: { nick: string; photo: string | null; bot?: boolean }, size = 32): string {
+  return avatar({ firstName: m.nick.replace(/^Бот /, ''), photoUrl: m.photo }, size).replace('class="avatar"', `class="avatar${m.bot ? ' bot' : ''}"`);
+}
+
 function quoteCard(store: Store): string {
   const q = QUOTES[store.quote] ?? QUOTES[0];
   return `<button type="button" class="quote" data-act="nextQuote" aria-label="Следующая фраза">

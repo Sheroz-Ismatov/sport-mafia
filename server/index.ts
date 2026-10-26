@@ -146,6 +146,21 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     sendJson(res, 404, { error: 'Не найдено' });
   };
 
+  // Фото игроков из Telegram для мест за столом (запоминаем, чтобы не ходить в базу на каждый вход)
+  const photos = new Map<number, string | null>();
+  const photoOf = async (userId: number | null): Promise<string | null> => {
+    if (userId === null || !db) return null;
+    if (photos.has(userId)) return photos.get(userId)!;
+    try {
+      const u = await db.getUser(userId);
+      const photo = u?.photoUrl && /^https:\/\//.test(u.photoUrl) ? u.photoUrl : null;
+      photos.set(userId, photo);
+      return photo;
+    } catch {
+      return null;
+    }
+  };
+
   const newCode = (): string => {
     for (;;) {
       const code = 'MAF-' + String(Math.floor(1000 + Math.random() * 9000));
@@ -237,7 +252,13 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     };
     const error = (message: string) => send({ t: 'error', message });
 
+    // Сообщения одного соединения обрабатываем строго по очереди: вход ждёт фото из базы
+    let queue: Promise<void> = Promise.resolve();
     ws.on('message', (data) => {
+      queue = queue.then(() => onMessage(data)).catch((e) => console.error('Ошибка обработки сообщения', e));
+    });
+
+    const onMessage = async (data: unknown): Promise<void> => {
       let msg: ClientMessage;
       try {
         msg = JSON.parse(String(data));
@@ -254,7 +275,10 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
           if (msg.t === 'create') {
             room = new Room(newCode(), { ...opts, onGameEnd: (r) => { saveGame(r).catch((e) => console.error('Не удалось сохранить партию', e)); } });
             rooms.set(room.code, room);
-            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userOf(msg.session));
+            const userId = userOf(msg.session);
+            const photo = await photoOf(userId);
+            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userId);
+            member.photoUrl = photo;
             room.ownerToken = member.token;
           } else {
             const found = rooms.get(String(msg.code ?? '').trim().toUpperCase());
@@ -268,7 +292,10 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             if (msg.t === 'join') {
               // Тот же аккаунт уже в комнате (например, зашёл с телефона вместо ноутбука): возвращаем на своё место
               const userId = userOf(msg.session);
-              member = found.memberOfUser(userId) ?? found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player', false, userId);
+              const photo = await photoOf(userId);
+              const already = found.memberOfUser(userId);
+              member = already ?? found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player', false, userId);
+              if (!already) member.photoUrl = photo;
             } else {
               member = found.members.get(String(msg.token)) ?? null;
               if (!member || member.bot) {
@@ -298,7 +325,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
       } catch (e) {
         error(e instanceof Error ? e.message : 'Ошибка');
       }
-    });
+    };
 
     ws.on('close', () => {
       if (room && member && member.send === send) room.disconnect(member);

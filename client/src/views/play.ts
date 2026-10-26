@@ -304,7 +304,9 @@ export function renderPlay(store: Store): string {
     parts.push('<div class="banner">Вы выбыли и теперь наблюдаете. Ваша роль скрыта от остальных до конца партии. Микрофон и чат отключены, подсказки игрокам запрещены.</div>');
   }
 
-  parts.push(renderTable(game, { mySeat: me?.seat ?? null, selected: store.selected, canPick: mode ? mode.allow : null, offset: store.offset }));
+  const photos = new Map<number, string>();
+  for (const m of store.room?.members ?? []) if (m.seat && m.photo) photos.set(m.seat, m.photo);
+  parts.push(renderTable(game, { mySeat: me?.seat ?? null, selected: store.selected, canPick: mode ? mode.allow : null, offset: store.offset, photos }));
 
   switch (game.phase) {
     case 'deal':

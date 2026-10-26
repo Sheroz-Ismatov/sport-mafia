@@ -15,6 +15,7 @@ export interface Member {
   kind: MemberKind;
   bot: boolean;
   userId: number | null; // аккаунт Telegram (null — гость или бот)
+  photoUrl: string | null; // фото из Telegram для места за столом
   send: ((msg: ServerMessage) => void) | null; // null — сейчас не на связи
 }
 
@@ -75,7 +76,7 @@ export class Room {
     if (kind === 'spectator' && this.spectators().length >= this.opts.maxSpectators) {
       throw new Error('В комнате нет мест для зрителей');
     }
-    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, userId, send: null };
+    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, userId, photoUrl: null, send: null };
     this.members.set(member.token, member);
     return member;
   }
@@ -321,7 +322,7 @@ export class Room {
 
   info(m: Member): RoomInfo {
     const members: MemberInfo[] = [...this.members.values()].map((x) => ({
-      id: x.id, nick: x.nick, kind: x.kind, connected: x.bot || x.send !== null, bot: x.bot, seat: this.seatOf(x),
+      id: x.id, nick: x.nick, kind: x.kind, connected: x.bot || x.send !== null, bot: x.bot, seat: this.seatOf(x), photo: x.photoUrl,
     }));
     return {
       code: this.code,

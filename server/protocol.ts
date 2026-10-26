@@ -26,6 +26,7 @@ export interface MemberInfo {
   connected: boolean;
   bot: boolean;
   seat: number | null;
+  photo: string | null; // фото из Telegram (https)
 }
 
 export interface RoomInfo {

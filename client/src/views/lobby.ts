@@ -1,7 +1,8 @@
 // Главный экран (создать или войти) и лобби комнаты.
 
 import type { Store } from '../store.ts';
-import { esc } from '../util.ts';
+import { esc, seatPosition } from '../util.ts';
+import { memberAvatar } from './home.ts';
 import { exitButtons } from './exit.ts';
 import { inTelegram, telegramLink } from '../tg.ts';
 import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
@@ -14,6 +15,32 @@ function composition(n: number): string {
   return `${n} игроков: ${c.civilian} мирных, шериф, ${blacks}${n < MAX_PLAYERS ? '. Неполный стол: чёрных двое' : ''}`;
 }
 
+/** Круглый стол в лобби: игроки по порядку входа, пустые места пунктиром. Места разыграются при старте. */
+function lobbyTable(store: Store): string {
+  const room = store.room!;
+  const players = room.members.filter((m) => m.kind === 'player');
+  const host = room.members.find((m) => m.kind === 'host');
+  const seats = Array.from({ length: MAX_PLAYERS }, (_, i) => {
+    const pos = seatPosition(i + 1, MAX_PLAYERS);
+    const m = players[i];
+    const style = `left:${pos.left}%;top:${pos.top}%`;
+    if (!m) return `<div class="lseat empty" style="${style}"><span class="plus">+</span><small>свободно</small></div>`;
+    const cls = ['lseat'];
+    if (m.id === room.you.id) cls.push('me');
+    if (!m.connected) cls.push('off');
+    return `<div class="${cls.join(' ')}" style="${style}" data-vid="${esc(m.id)}">${memberAvatar(m, 34)}<small>${m.id === room.you.id ? 'вы' : esc(m.nick)}</small></div>`;
+  }).join('');
+  const need = Math.max(0, MIN_PLAYERS - players.length);
+  return `<div class="table lobby-table">${seats}
+    <div class="table-center">
+      <span class="lbl">За столом</span>
+      <span class="lobby-count">${players.length}<small>/${MAX_PLAYERS}</small></span>
+      <span class="sub">${need ? `ещё ${need} до старта` : players.length < MAX_PLAYERS ? 'можно начинать' : 'стол полный'}</span>
+      ${host ? `<span class="lobby-host" data-vid="${esc(host.id)}">${memberAvatar(host, 22)}<small>ведущий ${host.id === room.you.id ? '(вы)' : esc(host.nick)}</small></span>` : ''}
+    </div>
+  </div>`;
+}
+
 export function renderLobby(store: Store): string {
   const room = store.room!;
   const isHost = room.you.owner;
@@ -21,36 +48,28 @@ export function renderLobby(store: Store): string {
   const tgLink = telegramLink(store.config, room.code);
   const players = room.members.filter((m) => m.kind === 'player');
   const spectators = room.members.filter((m) => m.kind === 'spectator');
-  const host = room.members.find((m) => m.kind === 'host');
-  const item = (m: (typeof room.members)[number]) =>
-    `<div class="member" data-vid="${esc(m.id)}"><span class="dotc ${m.connected ? '' : 'off'}"></span><span>${esc(m.nick)}</span>
-      <small>${m.bot ? 'бот' : m.id === room.you.id ? 'вы' : m.connected ? '' : 'не в сети'}</small></div>`;
+  const who = room.you.kind === 'host' ? 'Вы ведущий' : room.you.kind === 'spectator' ? 'Вы зритель' : 'Вы игрок';
 
-  return `<div class="screen">
-    <div class="top"><div class="top-left"><span class="eyebrow">${room.you.kind === 'host' ? 'Вы ведущий' : room.you.kind === 'spectator' ? 'Вы зритель' : 'Вы игрок'}${room.you.owner && room.you.kind !== 'host' ? ' и создатель комнаты' : ''}</span><h1>Лобби</h1></div>
-      <span class="pill gold">${players.length} из ${MAX_PLAYERS}</span></div>
-    <div class="card accent">
-      <span class="eyebrow">Код комнаты</span>
-      <span class="code-big">${esc(room.code)}</span>
+  return `<div class="screen lobby">
+    <div class="top"><div class="top-left"><span class="eyebrow">${who}${room.you.owner && room.you.kind !== 'host' ? ' и создатель стола' : ''}</span><h1>Собираем стол</h1></div></div>
+    ${lobbyTable(store)}
+    <div class="card accent invite">
+      <div class="invite-code"><span class="eyebrow">Код стола</span><span class="code-big">${esc(room.code)}</span></div>
       ${tgLink ? `<div class="grid2">
-        <button class="btn small primary" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать в Telegram' : 'Ссылка в Telegram'}</button>
+        <button class="btn small primary" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать друзей' : 'Ссылка в Telegram'}</button>
         <button class="btn small" data-act="invite" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
       </div>
       <button class="btn small ghost" data-act="copyLink" data-v="${esc(link)}">Ссылка для браузера</button>` : `<div class="grid2">
-        <button class="btn small" data-act="copyLink" data-v="${esc(link)}">Скопировать ссылку</button>
-        <button class="btn small" data-act="copyLink" data-v="${esc(link + '&as=spectator')}">Ссылка для зрителей</button>
+        <button class="btn small primary" data-act="copyLink" data-v="${esc(link)}">Скопировать ссылку</button>
+        <button class="btn small" data-act="copyLink" data-v="${esc(link + '&as=spectator')}">Для зрителей</button>
       </div>`}
     </div>
     ${isHost ? `<div class="stack">
-      <p class="note">${composition(players.length)}</p>
-      <button class="btn primary" data-act="start" ${players.length >= MIN_PLAYERS ? '' : 'disabled'}>Начать раздачу карт</button>
-      ${players.length < MAX_PLAYERS ? `<button class="btn" data-act="addBots">Добрать ботами до ${MAX_PLAYERS} (+${MAX_PLAYERS - players.length})</button>
-      <p class="hint">Играть можно от ${MIN_PLAYERS} человек без ботов. Боты ходят случайно, они нужны для проверки.</p>` : ''}
-    </div>` : `<p class="note">${composition(players.length)}</p>
-      <p class="hint">Ждём, пока создатель комнаты начнёт игру. Места за столом разыграются случайно.</p>`}
-    <div class="stack"><h2>Ведущий</h2>${host ? `<div class="members">${item(host)}</div>` : '<p class="hint">Без ведущего: таймеры идут сами, фолов и удалений нет.</p>'}</div>
-    <div class="stack"><h2>Игроки</h2><div class="members">${players.map(item).join('') || '<p class="hint">Пока никого</p>'}</div></div>
-    ${spectators.length ? `<div class="stack"><h2>Зрители</h2><div class="members">${spectators.map(item).join('')}</div></div>` : ''}
+      <button class="btn primary" data-act="start" ${players.length >= MIN_PLAYERS ? '' : 'disabled'}>Раздать карты</button>
+      <p class="hint center">${composition(players.length)}</p>
+      ${players.length < MAX_PLAYERS ? `<button class="btn ghost small" data-act="addBots">Добрать ботами до ${MAX_PLAYERS} (+${MAX_PLAYERS - players.length})</button>` : ''}
+    </div>` : `<p class="hint center">${composition(players.length)}. Ждём, пока создатель стола раздаст карты, места разыграются случайно.</p>`}
+    ${spectators.length ? `<div class="spectators"><span class="k">Зрители</span><span class="faces">${spectators.slice(0, 8).map((m) => `<span title="${esc(m.nick)}">${memberAvatar(m, 26)}</span>`).join('')}${spectators.length > 8 ? `<small>+${spectators.length - 8}</small>` : ''}</span></div>` : ''}
     ${exitButtons(store)}
   </div>`;
 }

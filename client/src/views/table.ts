@@ -8,6 +8,7 @@ export interface TableOptions {
   selected: number[];
   canPick: ((n: number) => boolean) | null; // null — сейчас номера не выбираются
   offset: number;
+  photos?: Map<number, string>; // фото из Telegram по номеру места
 }
 
 const serverNow = (offset: number) => Date.now() + offset;
@@ -78,6 +79,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
     if (o.selected.includes(s.seat)) cls.push('selected');
     if (game.phase === 'deal' && game.deal?.turn === s.seat) cls.push('turn');
     const fouls = s.fouls ? '●'.repeat(s.fouls) : '';
+    const photo = o.photos?.get(s.seat);
     // На раздаче: у взявшего карту появляется рубашка (анимация продолжается при перерисовке)
     const got = game.phase === 'deal' && s.dealtAt !== null
       ? `<span class="got" style="animation-delay:${s.dealtAt - serverNow(o.offset)}ms"></span>`
@@ -85,7 +87,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
     const label = `Место ${s.seat}, ${s.nick}${s.alive ? '' : ', ' + outText(s)}${s.fouls ? `, фолов ${s.fouls}` : ''}`;
     return `<button type="button" class="${cls.join(' ')}" style="left:${pos.left}%;top:${pos.top}%"
       data-act="seat" data-n="${s.seat}" data-vseat="${s.seat}" ${pickable ? '' : 'disabled'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
-      <span class="n">${s.seat}</span><span class="s">${sub}</span><span class="f">${fouls}</span>${got}</button>`;
+      ${photo ? `<span class="nrow"><span class="sav"><img src="${esc(photo)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></span><span class="n">${s.seat}</span></span>` : `<span class="n">${s.seat}</span>`}<span class="s">${sub}</span><span class="f">${fouls}</span>${got}</button>`;
   }).join('');
   return `<div class="table">${seats}<div class="table-center">${centerHtml(game, o.offset)}</div></div>`;
 }
