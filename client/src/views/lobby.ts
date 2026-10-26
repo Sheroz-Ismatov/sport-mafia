@@ -3,7 +3,6 @@
 import type { Store } from '../store.ts';
 import { esc } from '../util.ts';
 import { exitButtons } from './exit.ts';
-import { accountCard } from './profile.ts';
 import { inTelegram, telegramLink } from '../tg.ts';
 import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
 
@@ -13,38 +12,6 @@ function composition(n: number): string {
   const c = roleCounts(n);
   const blacks = c.mafia === 1 ? 'дон и мафия' : `дон и ${c.mafia} мафии`;
   return `${n} игроков: ${c.civilian} мирных, шериф, ${blacks}${n < MAX_PLAYERS ? '. Неполный стол: чёрных двое' : ''}`;
-}
-
-export function renderHome(store: Store): string {
-  const joining = store.code !== '';
-  return `<div class="screen">
-    <div class="brand"><img src="/img/logo.webp" alt="" width="72" height="72">
-      <div class="top-left"><span class="eyebrow">Онлайн-стол на ${MIN_PLAYERS}-${MAX_PLAYERS} игроков</span><h1>Спортивная мафия</h1></div></div>
-    ${accountCard(store)}
-    <div class="field"><label for="nick">Ваш ник</label>
-      <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
-    <div class="card">
-      <h2>Войти в комнату</h2>
-      <div class="field"><label for="code">Код комнаты</label>
-        <input id="code" class="code-input" data-model="code" maxlength="12" value="${esc(store.code)}" placeholder="MAF-4821" autocapitalize="characters"></div>
-      <div class="seg" role="group" aria-label="Как войти">
-        <button type="button" data-act="joinAs" data-v="player" aria-pressed="${store.joinAs === 'player'}">Игроком</button>
-        <button type="button" data-act="joinAs" data-v="spectator" aria-pressed="${store.joinAs === 'spectator'}">Зрителем</button>
-      </div>
-      <button class="btn primary" data-act="join">Войти</button>
-    </div>
-    ${store.prevSession ? `<div class="card">
-      <p class="note">Вы открыли приглашение в комнату ${esc(store.code)}. У вас есть незаконченная игра в ${esc(store.prevSession.code)}.</p>
-      <button class="btn small" data-act="backToPrev">Вернуться в ${esc(store.prevSession.code)}</button>
-    </div>` : ''}
-    ${joining ? '' : `<div class="card">
-      <h2>Новая комната</h2>
-      <button class="btn" data-act="create" data-v="host">Создать и вести игру</button>
-      <p class="hint">Вы ведущий: следите за временем и фолами, видите все роли.</p>
-      <button class="btn" data-act="create" data-v="player">Создать и играть самому</button>
-      <p class="hint">Вы за столом как игрок. Ведущего нет: таймеры идут сами, фолы не выдаются. Удобно, чтобы сыграть с ботами.</p>
-    </div>`}
-  </div>`;
 }
 
 export function renderLobby(store: Store): string {

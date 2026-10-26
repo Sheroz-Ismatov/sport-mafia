@@ -6,7 +6,10 @@ import { Net } from './net.ts';
 import { save, store } from './store.ts';
 import { clock, isNightLike, remainingMs } from './util.ts';
 import { renderHost } from './views/host.ts';
-import { renderHome, renderLobby } from './views/lobby.ts';
+import { renderLobby } from './views/lobby.ts';
+import { renderHome } from './views/home.ts';
+import { renderRules } from './views/rules.ts';
+import { randomQuoteIndex } from './quotes.ts';
 import { pickMode, renderPlay } from './views/play.ts';
 import { markTalking, renderVoice } from './views/voice.ts';
 import { VoiceClient } from './voice.ts';
@@ -43,6 +46,8 @@ function onMessage(msg: ServerMessage): void {
   switch (msg.t) {
     case 'welcome':
       store.prevSession = null;
+      store.sheet = null;
+      store.screen = 'main';
       store.session = { code: msg.code, token: msg.token };
       save('mafia.session', store.session);
       history.replaceState(null, '', '/');
@@ -119,7 +124,7 @@ function maybeAutoJoin(): void {
 
 async function loadProfile(): Promise<void> {
   const acc = store.account;
-  if (!acc) return;
+  if (!acc || store.profile.loading) return;
   store.profile = { stats: store.profile.stats, error: null, loading: true };
   render();
   try {
@@ -158,6 +163,8 @@ async function startAccount(): Promise<void> {
   store.authPending = false;
   render();
   maybeAutoJoin();
+  // Статистика для главного экрана
+  if (store.account) void loadProfile();
 }
 
 // Голос перерисовывает только свою плашку и подсветку мест: он меняется часто
@@ -194,6 +201,7 @@ function render(): void {
   const game = store.game;
   let html: string;
   if (!room && store.screen === 'profile' && store.account) html = renderProfile(store);
+  else if (!room && store.screen === 'rules') html = renderRules();
   else if (!room) html = renderHome(store);
   else if (!game) html = renderLobby(store);
   else if (room.you.kind === 'host') html = renderHost(store);
@@ -280,9 +288,23 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   },
   profile: () => {
     store.screen = 'profile';
+    store.sheet = null;
+    render();
+    window.scrollTo(0, 0);
     void loadProfile();
   },
   profileBack: () => { store.screen = 'main'; render(); },
+  sheet: (el) => {
+    store.sheet = el.dataset.v === 'join' ? 'join' : 'create';
+    render();
+    // На телефоне сразу открываем клавиатуру там, где нужно ввести
+    const input = root.querySelector<HTMLInputElement>(store.sheet === 'join' && store.nick.trim() ? '#code' : '#nick');
+    if (input && !(store.sheet === 'join' && store.code)) input.focus();
+  },
+  sheetClose: () => { store.sheet = null; render(); },
+  nextQuote: () => { store.quote = randomQuoteIndex(store.quote); render(); },
+  rules: () => { store.screen = 'rules'; store.sheet = null; render(); window.scrollTo(0, 0); },
+  rulesBack: () => { store.screen = 'main'; render(); window.scrollTo(0, 0); },
   logout: () => {
     setAccount(null);
     store.screen = 'main';
@@ -423,7 +445,7 @@ root.addEventListener('input', (e) => {
 
 root.addEventListener('keydown', (e) => {
   const input = e.target as HTMLElement;
-  if (e.key === 'Enter' && input.dataset?.model) handlers[store.code ? 'join' : 'create']?.(input);
+  if (e.key === 'Enter' && input.dataset?.model && store.sheet === 'join') handlers.join(input);
   if ((e.key === 'Enter' || e.key === ' ') && input.dataset?.act === 'flipCard') {
     e.preventDefault();
     handlers.flipCard(input);

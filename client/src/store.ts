@@ -4,6 +4,7 @@ import type { GameView } from '../../engine/index.ts';
 import type { ApiConfig, RoomInfo } from '../../server/protocol.ts';
 import type { Account, Stats } from './tg.ts';
 import { miniAppInitData, parseStartParam } from './tg.ts';
+import { randomQuoteIndex } from './quotes.ts';
 
 export interface Session { code: string; token: string }
 
@@ -35,7 +36,9 @@ export interface Store {
   account: Account | null;       // вошёл через Telegram
   authPending: boolean;          // внутри Telegram ждём проверки входа
   autoJoin: boolean;             // открыли приглашение в Telegram: сесть за стол сразу
-  screen: 'main' | 'profile';
+  screen: 'main' | 'profile' | 'rules';
+  sheet: 'create' | 'join' | null; // выезжающее окно на главном экране
+  quote: number;                    // какая фраза Дона на главном экране
   profile: { stats: Stats | null; error: string | null; loading: boolean };
 }
 
@@ -96,5 +99,7 @@ export const store: Store = {
   authPending: miniAppInitData !== null,
   autoJoin: !!tgLaunch?.invite,
   screen: 'main',
+  sheet: null,
+  quote: randomQuoteIndex(),
   profile: { stats: null, error: null, loading: false },
 };
