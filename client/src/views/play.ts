@@ -343,8 +343,8 @@ export function renderPlay(store: Store): string {
   if (me?.alive && game.phase !== 'zeroNight' && game.phase !== 'ended') parts.push(mafiaMemo(game, game.phase === 'night'));
   parts.push(checksCard(game));
   parts.push(infoCard(game));
-  if (!['ended', 'zeroNight', 'deal'].includes(game.phase)) {
-    parts.push('<p class="hint">Голос пока не подключён: для проверки созвонитесь в любом мессенджере. Сервер уже знает, чей микрофон должен быть открыт.</p>');
+  if (!store.room?.voice && !['ended', 'zeroNight', 'deal'].includes(game.phase)) {
+    parts.push('<p class="hint">Голос на этом сервере не настроен: для проверки созвонитесь в любом мессенджере.</p>');
   }
   parts.push(logCard(game, store.showLog || game.phase === 'ended'));
   parts.push('<button class="btn ghost" data-act="leave">Выйти из комнаты</button>');

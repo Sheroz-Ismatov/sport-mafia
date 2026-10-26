@@ -46,7 +46,7 @@ export function renderLobby(store: Store): string {
   const spectators = room.members.filter((m) => m.kind === 'spectator');
   const host = room.members.find((m) => m.kind === 'host');
   const item = (m: (typeof room.members)[number]) =>
-    `<div class="member"><span class="dotc ${m.connected ? '' : 'off'}"></span><span>${esc(m.nick)}</span>
+    `<div class="member" data-vid="${esc(m.id)}"><span class="dotc ${m.connected ? '' : 'off'}"></span><span>${esc(m.nick)}</span>
       <small>${m.bot ? 'бот' : m.id === room.you.id ? 'вы' : m.connected ? '' : 'не в сети'}</small></div>`;
 
   return `<div class="screen">

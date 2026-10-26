@@ -8,8 +8,11 @@ import { clock, isNightLike, remainingMs } from './util.ts';
 import { renderHost } from './views/host.ts';
 import { renderHome, renderLobby } from './views/lobby.ts';
 import { pickMode, renderPlay } from './views/play.ts';
+import { markTalking, renderVoice } from './views/voice.ts';
+import { VoiceClient } from './voice.ts';
 
 const root = document.getElementById('app')!;
+const voiceRoot = document.getElementById('voice')!;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function toast(text: string): void {
@@ -40,8 +43,12 @@ function onMessage(msg: ServerMessage): void {
       if (msg.game?.phase === 'deal' && dealtAt !== null && dealtAt !== prev) setTimeout(render, 1600);
       store.room = msg.room;
       store.game = msg.game;
+      voice.update(msg.room);
       break;
     }
+    case 'voice':
+      void voice.connect(msg.url, msg.token);
+      return;
     case 'error':
       if (msg.code === 'room_gone') {
         forgetSession();
@@ -61,6 +68,7 @@ function forgetSession(): void {
   store.session = null;
   store.room = null;
   store.game = null;
+  voice.update(null);
   save('mafia.session', null);
 }
 
@@ -71,6 +79,16 @@ const net = new Net(onMessage, (online) => {
 }, () => {
   if (store.session) net.send({ t: 'resume', code: store.session.code, token: store.session.token });
 });
+
+// Голос перерисовывает только свою плашку и подсветку мест: он меняется часто
+const voice = new VoiceClient((msg) => net.send(msg), () => renderVoiceBar());
+
+function renderVoiceBar(): void {
+  const html = renderVoice(store.room, store.game, voice.state, voice.canSpeak);
+  if (voiceRoot.innerHTML !== html) voiceRoot.innerHTML = html;
+  document.body.classList.toggle('has-voice', html !== '');
+  markTalking(root, store.room, voice.state.talking);
+}
 
 function act(action: Action): void {
   net.send({ t: 'act', action });
@@ -110,6 +128,8 @@ function render(): void {
 
   document.body.classList.toggle('is-night', isNightLike(game) && room?.you.kind !== 'host');
   root.innerHTML = html;
+
+  renderVoiceBar();
 
   if (focusModel) {
     const input = root.querySelector<HTMLInputElement>(`[data-model="${focusModel}"]`);
@@ -232,6 +252,12 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     render();
   },
   tab: (el) => { store.hostTab = el.dataset.v as typeof store.hostTab; render(); },
+
+  // Голос
+  voiceOn: () => { void voice.start(); },
+  voiceOff: () => { void voice.stop(); },
+  voiceMute: () => voice.toggleMute(),
+  voiceTap: () => { void voice.unlockAudio(); },
 };
 
 root.addEventListener('click', (e) => {
@@ -245,6 +271,11 @@ root.addEventListener('click', (e) => {
     render();
   }
   handlers[name]?.(el);
+});
+
+voiceRoot.addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+  if (el && !(el as HTMLButtonElement).disabled) handlers[el.dataset.act!]?.(el);
 });
 
 root.addEventListener('input', (e) => {

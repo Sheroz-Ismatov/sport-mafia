@@ -14,6 +14,8 @@ export type ClientMessage =
   | { t: 'restart' }                                                      // создатель: новая партия после окончания
   | { t: 'act'; action: Action }                                          // ход в игре
   | { t: 'leave' }
+  | { t: 'voice' }                                                        // попросить пропуск в голосовую комнату
+  | { t: 'voiceJoined' }                                                  // подключился к голосу (или переподключился)
   | { t: 'ping' };                                                        // сердцебиение раз в 25 с, держит связь
 
 export interface MemberInfo {
@@ -27,8 +29,9 @@ export interface MemberInfo {
 
 export interface RoomInfo {
   code: string;
-  you: { id: string; kind: MemberKind; seat: number | null; owner: boolean };
+  you: { id: string; kind: MemberKind; seat: number | null; owner: boolean; mic: boolean }; // mic — можно говорить прямо сейчас
   hostless: boolean;   // комната без ведущего: таймеры идут сами, фолов нет
+  voice: boolean;      // на сервере настроен голос
   members: MemberInfo[];
   players: number;     // сколько игроков за столом (нужно 10)
   spectators: number;
@@ -38,5 +41,6 @@ export interface RoomInfo {
 export type ServerMessage =
   | { t: 'welcome'; code: string; token: string }               // токен хранить в localStorage для resume
   | { t: 'state'; now: number; room: RoomInfo; game: GameView | null } // now — время сервера для таймеров; game === null в лобби
+  | { t: 'voice'; url: string; token: string }                  // пропуск в голосовую комнату LiveKit
   | { t: 'error'; message: string; code?: 'room_gone' } // room_gone — вернуться некуда, комнаты больше нет
   | { t: 'closed'; reason: string };

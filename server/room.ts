@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { Game, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine/index.ts';
 import type { Action, Actor, Settings, Viewer } from '../engine/index.ts';
 import { botAction } from './bots.ts';
+import type { Voice } from './voice.ts';
 import type { ClientMessage, MemberInfo, MemberKind, RoomInfo, ServerMessage } from './protocol.ts';
 
 export interface Member {
@@ -23,6 +24,7 @@ export interface RoomOptions {
   botDelayMs?: [number, number];
   maxSpectators?: number;
   onGameEnd?: (room: Room) => void;
+  voice?: Voice | null; // голос через LiveKit; null — без голоса
 }
 
 const MAX_NICK = 24;
@@ -40,7 +42,7 @@ export class Room {
   emptySince: number | null = null;
   ownerToken: string | null = null; // кто создал комнату: начинает игру, добавляет ботов, запускает новую партию
 
-  private readonly opts: Required<Omit<RoomOptions, 'settings' | 'onGameEnd'>> & Pick<RoomOptions, 'settings' | 'onGameEnd'>;
+  private readonly opts: Required<Omit<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>> & Pick<RoomOptions, 'settings' | 'onGameEnd' | 'voice'>;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private botTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private endReported = false;
@@ -54,6 +56,7 @@ export class Room {
       maxSpectators: opts.maxSpectators ?? 200,
       settings: opts.settings,
       onGameEnd: opts.onGameEnd,
+      voice: opts.voice ?? null,
     };
   }
 
@@ -127,11 +130,41 @@ export class Room {
         case 'leave':
           this.leave(m);
           return null;
+        case 'voice': return this.voiceJoin(m);
+        case 'voiceJoined':
+          this.opts.voice?.joined(this.code, m.id);
+          return null;
         default: return 'Неизвестная команда';
       }
     } catch (e) {
       return e instanceof Error ? e.message : 'Ошибка';
     }
+  }
+
+  // ---------- Голос ----------
+
+  /**
+   * Может ли участник говорить прямо сейчас.
+   * Ведущий говорит всегда. В лобби и после партии говорят все игроки.
+   * Во время партии только тот, у кого слово (речь, оправдание, последняя минута). Ночью, на раздаче,
+   * в договорку и при голосовании микрофоны закрыты. Наблюдатели и выбывшие только слушают.
+   */
+  canSpeak(m: Member): boolean {
+    if (m.bot || m.kind === 'spectator') return false;
+    if (m.kind === 'host') return true;
+    const game = this.game;
+    if (!game || game.phase === 'ended') return true;
+    const seat = this.seatOf(m);
+    return seat !== null && game.micOpen().includes(seat);
+  }
+
+  private voiceJoin(m: Member): string | null {
+    const voice = this.opts.voice;
+    if (!voice) return 'Голос на сервере не настроен';
+    if (m.bot) return 'Ботам голос не нужен';
+    const pass = voice.join(this.code, m.id, m.nick, this.canSpeak(m));
+    m.send?.({ t: 'voice', ...pass });
+    return null;
   }
 
   private addBots(m: Member): string | null {
@@ -271,8 +304,9 @@ export class Room {
     }));
     return {
       code: this.code,
-      you: { id: m.id, kind: m.kind, seat: this.seatOf(m), owner: this.isOwner(m) },
+      you: { id: m.id, kind: m.kind, seat: this.seatOf(m), owner: this.isOwner(m), mic: this.canSpeak(m) },
       hostless: !this.host(),
+      voice: this.opts.voice != null,
       members,
       players: this.players().length,
       spectators: this.spectators().length,
@@ -280,6 +314,8 @@ export class Room {
   }
 
   broadcast(): void {
+    const voice = this.opts.voice;
+    if (voice) for (const m of this.members.values()) if (!m.bot) voice.setAllowed(this.code, m.id, this.canSpeak(m));
     for (const m of this.members.values()) {
       if (!m.send) continue;
       m.send({
@@ -293,6 +329,7 @@ export class Room {
 
   close(reason: string): void {
     this.stopTimers();
+    this.opts.voice?.dropRoom(this.code);
     for (const m of this.members.values()) m.send?.({ t: 'closed', reason });
   }
 }

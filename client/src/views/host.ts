@@ -97,7 +97,7 @@ function seatRows(store: Store, game: GameView): string {
         <button class="btn tiny ${armedPpk ? 'red' : 'outline-red'}" data-act="ppk" data-n="${s.seat}">${armedPpk ? 'Точно ППК?' : 'ППК'}</button>
       </div>`;
     }
-    return `<div class="${cls.join(' ')}"><span class="num">${s.seat}</span>
+    return `<div class="${cls.join(' ')}" data-vseat="${s.seat}"><span class="num">${s.seat}</span>
       <div class="who"><b>${esc(s.nick)}${offline}</b><small class="t-${role ?? 'none'}">${role ? ROLE_SHORT[role] : 'ждёт карту'}${status}</small></div>
       <span class="fl ${s.fouls >= 3 ? 'warn' : ''}">${s.fouls}/4</span>${acts}</div>`;
   }).join('');

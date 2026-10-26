@@ -10,12 +10,19 @@ import { pathToFileURL } from 'node:url';
 import { DEFAULT_SETTINGS, teamOf } from '../engine/index.ts';
 import { Room } from './room.ts';
 import type { Member, RoomOptions } from './room.ts';
+import { Voice, voiceConfigFromEnv } from './voice.ts';
 import type { ClientMessage, ServerMessage } from './protocol.ts';
 
-const STATIC_FILES: Record<string, { name: string; type: string }> = {
-  '/index.html': { name: 'index.html', type: 'text/html; charset=utf-8' },
-  '/app.js': { name: 'app.js', type: 'text/javascript; charset=utf-8' },
-  '/styles.css': { name: 'styles.css', type: 'text/css; charset=utf-8' },
+const dist = (name: string) => new URL(`../client/dist/${name}`, import.meta.url);
+const STATIC_FILES: Record<string, { file: URL; type: string }> = {
+  '/index.html': { file: dist('index.html'), type: 'text/html; charset=utf-8' },
+  '/app.js': { file: dist('app.js'), type: 'text/javascript; charset=utf-8' },
+  '/styles.css': { file: dist('styles.css'), type: 'text/css; charset=utf-8' },
+  // Библиотека голоса LiveKit: ставится через npm install, грузится браузером, только когда включают голос
+  '/vendor/livekit-client.js': {
+    file: new URL('../node_modules/livekit-client/dist/livekit-client.umd.js', import.meta.url),
+    type: 'text/javascript; charset=utf-8',
+  },
 };
 
 export interface ServerOptions extends RoomOptions {
@@ -66,7 +73,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     const file = STATIC_FILES[path === '/' ? '/index.html' : path];
     if (file) {
       try {
-        const body = await readFile(new URL(`../client/dist/${file.name}`, import.meta.url));
+        const body = await readFile(file.file);
         res.writeHead(200, { 'content-type': file.type, 'cache-control': 'no-cache' });
         res.end(body);
       } catch {
@@ -201,7 +208,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const settings = scale > 0 && scale !== 1
     ? Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([k, v]) => [k, Math.round(v * scale)]))
     : undefined;
-  startServer({ port, settings }).then(() => {
+  const voiceCfg = voiceConfigFromEnv();
+  startServer({ port, settings, voice: voiceCfg ? new Voice(voiceCfg) : null }).then(() => {
     console.log(`Сервер спортивной мафии: http://localhost:${port}${settings ? ` (таймеры ×${scale})` : ''}`);
+    console.log(voiceCfg ? `Голос: ${voiceCfg.url}` : 'Голос выключен: не заданы LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET');
   });
 }

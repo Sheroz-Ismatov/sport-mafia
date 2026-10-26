@@ -84,7 +84,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
       : '';
     const label = `Место ${s.seat}, ${s.nick}${s.alive ? '' : ', ' + outText(s)}${s.fouls ? `, фолов ${s.fouls}` : ''}`;
     return `<button type="button" class="${cls.join(' ')}" style="left:${pos.left}%;top:${pos.top}%"
-      data-act="seat" data-n="${s.seat}" ${pickable ? '' : 'disabled'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
+      data-act="seat" data-n="${s.seat}" data-vseat="${s.seat}" ${pickable ? '' : 'disabled'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
       <span class="n">${s.seat}</span><span class="s">${sub}</span><span class="f">${fouls}</span>${got}</button>`;
   }).join('');
   return `<div class="table">${seats}<div class="table-center">${centerHtml(game, o.offset)}</div></div>`;

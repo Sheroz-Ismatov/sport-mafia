@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "esbuild": "^0.25.0",
+    "livekit-client": "^2.15.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
