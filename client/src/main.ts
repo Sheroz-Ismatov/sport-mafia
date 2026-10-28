@@ -239,6 +239,7 @@ function sheetKey(): string | null {
 let shownBar = '';
 let shownScreen = '';
 let wasNight: boolean | null = null;
+let memoPhase = '';
 
 /** Заставка на полторы секунды при смене дня и ночи. При «меньше движения» только плавно меняется фон. */
 function dusk(night: boolean): void {
@@ -272,6 +273,9 @@ function render(): void {
     store.selected = [];
   }
   if (store.game?.phase !== 'deal') store.cardHidden = false;
+  // Записка семьи сворачивается сама при смене фазы
+  const phaseKey = store.game ? `${store.game.phase}|${store.game.day}|${store.game.night}` : '';
+  if (phaseKey !== memoPhase) { memoPhase = phaseKey; store.memoOpen = false; }
   // Перед раздачей заранее грузим своего мирного кота: карта перевернётся уже с картинкой
   const meNow = store.room?.members.find((m) => m.id === store.room?.you.id);
   if (meNow?.art != null && meNow.seat) {
@@ -505,6 +509,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     store.code = '';
     render();
   },
+  memo: () => { store.memoOpen = !store.memoOpen; render(); },
   toggleLog: () => { store.showLog = !store.showLog; render(); },
 
   // Выбор номеров за столом

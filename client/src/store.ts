@@ -31,6 +31,7 @@ export interface Store {
   removeArmed: number | null;
   hostSeat: number | null; // ведущий открыл окно места: фолы, удаление, ППК
   showLog: boolean;
+  memoOpen: boolean; // записка семьи у чёрных развёрнута днём (сворачивается при смене фазы)
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
   menu: boolean;                         // открыто меню стола «⋯»
   confirm: 'leave' | 'disband' | null;   // окно подтверждения выхода или роспуска
@@ -99,6 +100,7 @@ export const store: Store = {
   removeArmed: null,
   hostSeat: null,
   showLog: false,
+  memoOpen: false,
   cardHidden: false,
   menu: false,
   confirm: null,

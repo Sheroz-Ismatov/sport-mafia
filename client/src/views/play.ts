@@ -67,16 +67,22 @@ function header(store: Store, game: GameView): string {
     <h1>${phaseTitle(game)}</h1></div>${badge}${menuButton()}</div>`;
 }
 
-function mafiaMemo(game: GameView, compact: boolean): string {
+/** Записка семьи: днём свёрнута (вдруг кто-то видит экран), ночью открыта сама. */
+function mafiaMemo(store: Store, game: GameView): string {
   const m = game.mafia;
   if (!m) return '';
+  const night = game.phase === 'night';
+  if (!night && !store.memoOpen) {
+    return `<button type="button" class="memo-closed" data-act="memo"><span>Записка семьи</span><b>Показать</b></button>`;
+  }
   const members = m.members.map((x) => `№${x.seat} ${x.role === 'don' ? 'дон' : 'мафия'}`).join(', ');
   const beacon = m.beacon ? `первый номер в речи дона +${m.beacon}` : 'без маяка';
   const plan = m.plan.length ? m.plan.map((n, i) => `Н${i + 1} №${n}`).join(' · ') : 'не задан';
   return `<div class="card gold">
+    <div class="row"><h2>Записка семьи</h2>${night ? '' : '<button class="link" data-act="memo">Скрыть</button>'}</div>
     <div class="row"><span class="k">Чёрные</span><span class="v">${members}</span></div>
-    ${compact ? '' : `<div class="row"><span class="k">План</span><span class="v">${plan}</span></div>`}
-    ${m.planTargetTonight ? `<div class="row"><span class="k">По плану ${game.phase === 'night' ? 'сейчас' : 'ночью'}</span><span class="v">№${m.planTargetTonight}</span></div>` : ''}
+    ${night ? '' : `<div class="row"><span class="k">План</span><span class="v">${plan}</span></div>`}
+    ${m.planTargetTonight ? `<div class="row"><span class="k">По плану ${night ? 'сейчас' : 'ночью'}</span><span class="v">№${m.planTargetTonight}</span></div>` : ''}
     <div class="row"><span class="k">Маяк</span><span class="v">${beacon}</span></div>
     <div class="row"><span class="k">Шериф</span><span class="v">«${esc(m.sheriffPhrase)}»</span></div>
   </div>`;
@@ -326,7 +332,7 @@ export function renderPlay(store: Store): string {
       break;
   }
 
-  if (me?.alive && game.phase !== 'zeroNight' && game.phase !== 'ended') parts.push(mafiaMemo(game, game.phase === 'night'));
+  if (me?.alive && game.phase !== 'zeroNight' && game.phase !== 'ended') parts.push(mafiaMemo(store, game));
   parts.push(checksCard(game));
   parts.push(infoCard(game));
   if (!store.room?.voice && !['ended', 'zeroNight', 'deal'].includes(game.phase)) {
