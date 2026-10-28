@@ -548,3 +548,22 @@ body.has-voice .offline { bottom: var(--voice-off); }
 .dusk.to-day { background: radial-gradient(circle at 50% 45%, #3A2A12, #0E1014 70%); color: var(--gold); }
 .dusk b { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--text); }
 @keyframes dusk { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- Голосование ---------- */
+.vote-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--panel); border: 2px solid var(--red); }
+.vote-card.mine { background: var(--red-bg); }
+.vote-who { display: flex; align-items: center; gap: 12px; }
+.vote-who .num { width: 52px; height: 64px; flex: none; border-radius: 10px; background: var(--seat); border: 1px solid var(--seat-line); display: grid; place-items: center; font-family: var(--display); font-size: 24px; font-weight: 700; }
+.vote-who > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vote-who > div b { font-size: 19px; overflow-wrap: anywhere; }
+.vote-who > div small { font-size: 13px; color: var(--muted); }
+.vote-count { display: flex; flex-direction: column; align-items: center; flex: none; }
+.vote-count b { font-family: var(--display); font-size: 28px; line-height: 1; color: var(--red-soft); }
+.vote-count small { font-size: 11px; color: var(--muted); }
+.vote-mine { margin: 0; font-size: 14px; font-weight: 700; color: var(--red-soft); }
+.vchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.vchip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 1px solid var(--line); background: var(--panel); color: var(--dim); }
+.vchip.done { color: var(--soft); }
+.vchip.done b { color: var(--red-soft); }
+.vchip.now { border-color: var(--red); color: var(--text); background: var(--red-bg); }
+.vchip.mine { box-shadow: inset 0 0 0 1px var(--red); }

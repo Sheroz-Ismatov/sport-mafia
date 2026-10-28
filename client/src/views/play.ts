@@ -185,29 +185,40 @@ function dayPanel(store: Store, game: GameView, mode: PickMode | null): string {
   </div>${nomCard}`;
 }
 
+function votesWord(n: number): string {
+  const d = n % 10, h = n % 100;
+  if (d === 1 && h !== 11) return 'голос';
+  if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return 'голоса';
+  return 'голосов';
+}
+
 function votingPanel(game: GameView): string {
   const v = game.voting!;
   const me = game.me;
   const myVote = me ? v.votes[me.seat] : undefined;
   const counts = new Map<number, number>();
   for (const t of Object.values(v.votes)) counts.set(t, (counts.get(t) ?? 0) + 1);
-  const rows = v.candidates.map((c, i) => {
-    const s = game.seats[c - 1];
-    const by = game.nominations.find((x) => x.target === c);
-    const cls = ['cand'];
-    if (i === v.index) cls.push('now');
-    if (myVote === c) cls.push('mine');
-    let btn = '';
-    if (me?.alive) {
-      if (myVote === c) btn = '<button class="btn small red" disabled>Ваш голос</button>';
-    }
-    return `<div class="${cls.join(' ')}"><div class="num">${c}</div>
-      <div class="who"><b>${esc(s.nick)}</b><small>${by ? `выставил №${by.by}` : 'переголосование'}</small></div>
-      <span class="count" aria-label="голосов">${counts.get(c) ?? 0}</span>${btn}</div>`;
-  }).join('');
+  const c = v.candidates[v.index];
+  const s = c ? game.seats[c - 1] : null;
+  const by = game.nominations.find((x) => x.target === c);
   const last = v.candidates[v.candidates.length - 1];
-  return `<div class="stack">${rows}</div>
-    <p class="hint">Голос отдаётся один раз. Кто не проголосует, голосует против №${last}, последнего кандидата.</p>`;
+
+  // Остальные кандидаты одной строкой: прошедшие с итогом, текущий выделен, будущие серые
+  const chips = v.candidates.map((x, i) => {
+    const cls = i < v.index ? 'done' : i === v.index ? 'now' : 'next';
+    const n = counts.get(x) ?? 0;
+    return `<span class="vchip ${cls}${myVote === x ? ' mine' : ''}">№${x}${i < v.index ? `<b>${n}</b>` : ''}</span>`;
+  }).join('');
+
+  const mine = myVote !== undefined ? `<p class="vote-mine">Твой голос: против №${myVote}</p>` : '';
+  return `<div class="vote-card${myVote === c ? ' mine' : ''}">
+      <span class="eyebrow">Голосуем против · ${v.index + 1} из ${v.candidates.length}</span>
+      ${s ? `<div class="vote-who"><span class="num">${c}</span><div><b>${esc(s.nick)}</b><small>${by ? `выставил №${by.by}` : 'переголосование'}</small></div>
+        <span class="vote-count"><b>${counts.get(c) ?? 0}</b><small>${votesWord(counts.get(c) ?? 0)}</small></span></div>` : ''}
+      ${mine}
+    </div>
+    <div class="vchips">${chips}</div>
+    <p class="hint">Кто не проголосует, голосует против №${last}, последнего кандидата.</p>`;
 }
 
 function liftPanel(game: GameView): string {
