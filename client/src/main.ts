@@ -20,6 +20,7 @@ import type { Account } from './tg.ts';
 import { renderProfile } from './views/profile.ts';
 import { preloadCardArt } from './views/cards.ts';
 import { seatArt } from './art.ts';
+import { inGame, menuSheets } from './views/exit.ts';
 
 const root = document.getElementById('app')!;
 let explicitResume = false; // человек сам нажал «Вернуться в прежнюю игру»
@@ -118,7 +119,8 @@ function forgetSession(): void {
   store.session = null;
   store.room = null;
   store.game = null;
-  store.disbandArmed = false;
+  store.menu = false;
+  store.confirm = null;
   voice.update(null);
   save('mafia.session', null);
 }
@@ -223,6 +225,8 @@ let shownSheet: string | null = null;
 function sheetKey(): string | null {
   if (store.sheet) return store.sheet;
   if (store.hostSeat) return `seat${store.hostSeat}`;
+  if (store.confirm) return `confirm-${store.confirm}`;
+  if (store.menu) return 'menu';
   return null;
 }
 let shownBar = '';
@@ -256,12 +260,13 @@ function render(): void {
   const game = store.game;
   let html: string;
   if (!room && store.screen === 'profile' && store.account) html = renderProfile(store);
-  else if (!room && store.screen === 'rules') html = renderRules();
+  else if (store.screen === 'rules') html = renderRules();
   else if (!room) html = renderHome(store);
   else if (!game) html = renderLobby(store);
   else if (room.you.kind === 'host') html = renderHost(store);
   else html = renderPlay(store);
 
+  if (room && store.screen !== 'rules') html += menuSheets(store);
   if (store.toast) html += `<div class="toast" role="alert">${store.toast.replace(/</g, '&lt;')}</div>`;
   if (!store.online && store.everConnected) html += '<div class="offline" role="status">Нет связи с сервером, переподключаемся…</div>';
 
@@ -279,7 +284,7 @@ function render(): void {
   document.body.classList.toggle('is-night', isNightLike(game) && room?.you.kind !== 'host');
   root.innerHTML = html;
   // Сменился экран (главный, лобби, партия, финал): начинаем сверху, а не с прокрутки прошлого экрана
-  const screenId = !room ? `home-${store.screen}` : !game ? 'lobby' : game.phase === 'ended' ? 'final' : 'game';
+  const screenId = store.screen === 'rules' ? 'rules' : !room ? `home-${store.screen}` : !game ? 'lobby' : game.phase === 'ended' ? 'final' : 'game';
   if (screenId !== shownScreen) {
     if (shownScreen !== '') window.scrollTo(0, 0);
     shownScreen = screenId;
@@ -304,7 +309,8 @@ function render(): void {
 
   // Системная кнопка «Назад» в Telegram: закрыть окно, выйти из профиля или правил
   if (sheetKey()) setBackButton(() => handlers.sheetClose(root));
-  else if (!room && store.screen !== 'main') setBackButton(() => { store.screen = 'main'; render(); window.scrollTo(0, 0); });
+  else if (store.screen !== 'main' && (store.screen === 'rules' || !room)) setBackButton(() => { store.screen = 'main'; render(); window.scrollTo(0, 0); });
+  else if (room && inGame(store)) setBackButton(() => handlers.askLeave(root)); // «Назад» посреди партии спрашивает, точно ли выйти
   else setBackButton(null);
 
   // Кнопка «Войти через Telegram» на сайте
@@ -424,10 +430,12 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     store.hostSeat = null;
     store.removeArmed = null;
     store.ppkArmed = null;
+    store.menu = false;
+    store.confirm = null;
     render();
   },
   nextQuote: () => { store.quote = randomQuoteIndex(store.quote); render(); },
-  rules: () => { store.screen = 'rules'; store.sheet = null; render(); window.scrollTo(0, 0); },
+  rules: () => { store.screen = 'rules'; store.sheet = null; store.menu = false; render(); window.scrollTo(0, 0); },
   rulesBack: () => { store.screen = 'main'; render(); window.scrollTo(0, 0); },
   logout: () => {
     setAccount(null);
@@ -437,13 +445,19 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   },
   addBots: () => net.send({ t: 'addBots' }),
   start: () => net.send({ t: 'start' }),
+  // Меню стола и подтверждения
+  menu: () => { store.menu = true; store.confirm = null; render(); },
+  askLeave: () => { store.menu = false; store.confirm = 'leave'; render(); },
+  askDisband: () => { store.menu = false; store.confirm = 'disband'; render(); },
+  soundToggle: (el) => {
+    store.sound = !store.sound;
+    save('mafia.sound', store.sound);
+    el.setAttribute('aria-pressed', String(store.sound));
+  },
   disband: () => {
-    if (!store.disbandArmed) {
-      store.disbandArmed = true;
-      return render();
-    }
-    store.disbandArmed = false;
+    store.confirm = null;
     net.send({ t: 'disband' });
+    render();
   },
   backToPrev: () => {
     const prev = store.prevSession;
@@ -456,6 +470,8 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     render();
   },
   leave: () => {
+    store.menu = false;
+    store.confirm = null;
     net.send({ t: 'leave' });
     forgetSession();
     store.code = '';
@@ -554,10 +570,6 @@ root.addEventListener('click', (e) => {
   if (name !== 'remove' && name !== 'ppk' && (store.removeArmed !== null || store.ppkArmed !== null)) {
     store.removeArmed = null;
     store.ppkArmed = null;
-    render();
-  }
-  if (name !== 'disband' && store.disbandArmed) {
-    store.disbandArmed = false;
     render();
   }
   handlers[name]?.(el);

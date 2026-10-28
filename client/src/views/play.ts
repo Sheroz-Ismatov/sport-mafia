@@ -4,7 +4,7 @@ import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
 import { ROLE_NAME, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
-import { exitButtons } from './exit.ts';
+import { menuButton } from './exit.ts';
 import { finaleCard } from './finale.ts';
 import { cardBack, flippingCard } from './cards.ts';
 import { seatArt } from '../art.ts';
@@ -63,8 +63,8 @@ function header(store: Store, game: GameView): string {
     badge = `<div class="badge"><div class="mini r-none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
       <div class="bt"><small>Наблюдатель</small><b>${room.spectators} в зале</b></div></div>`;
   }
-  return `<div class="top"><div class="top-left"><span class="eyebrow">Комната ${esc(room.code)}</span>
-    <h1>${phaseTitle(game)}</h1></div>${badge}</div>`;
+  return `<div class="top"><div class="top-left"><span class="eyebrow">Стол ${esc(room.code)}</span>
+    <h1>${phaseTitle(game)}</h1></div>${badge}${menuButton()}</div>`;
 }
 
 function mafiaMemo(game: GameView, compact: boolean): string {
@@ -326,7 +326,6 @@ export function renderPlay(store: Store): string {
     parts.push('<p class="hint">Голос на этом сервере не настроен: для проверки созвонитесь в любом мессенджере.</p>');
   }
   parts.push(logCard(game, store.showLog || game.phase === 'ended'));
-  parts.push(exitButtons(store));
   const bar = actionBar(store, game, mode);
   return `<div class="screen${bar ? ' with-bar' : ''}">${parts.join('')}</div>${bar}`;
 }

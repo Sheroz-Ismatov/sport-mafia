@@ -4,7 +4,7 @@ import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
 import { NIGHT_STEP, ROLE_NAME, ROLE_SHORT, clock, esc, isBlackRole, outText, phaseTitle, remainingMs, winnerText } from '../util.ts';
 import { logCard } from './play.ts';
-import { exitButtons } from './exit.ts';
+import { menuButton } from './exit.ts';
 import { finaleCard } from './finale.ts';
 import { renderTable } from './table.ts';
 
@@ -179,7 +179,7 @@ export function renderHost(store: Store): string {
     <div class="host-sticky">
       <div class="top"><div class="top-left"><span class="eyebrow">Стол ${esc(room.code)} · ты ведущий${room.spectators ? ` · зрителей ${room.spectators}` : ''}</span>
         <h1>${phaseTitle(game)}</h1></div>
-        <span class="host-sum">${summary}</span></div>
+        <span class="host-sum">${summary}</span>${menuButton()}</div>
       ${controlCard(store, game)}
       <div class="tabs" role="tablist" aria-label="Разделы панели">
         ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
@@ -195,7 +195,6 @@ export function renderHost(store: Store): string {
         ${pane('log', logCard(game, true, false))}
       </div>
     </div>
-    ${exitButtons(store)}
   </div>
   ${seatSheet(store, game)}`;
 }

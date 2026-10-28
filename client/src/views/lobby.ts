@@ -3,7 +3,7 @@
 import type { Store } from '../store.ts';
 import { esc, seatPosition } from '../util.ts';
 import { memberAvatar } from './home.ts';
-import { exitButtons } from './exit.ts';
+import { menuButton } from './exit.ts';
 import { inTelegram, telegramLink } from '../tg.ts';
 import { MAX_PLAYERS, MIN_PLAYERS, roleCounts } from '../../../engine/types.ts';
 
@@ -51,7 +51,7 @@ export function renderLobby(store: Store): string {
   const who = room.you.kind === 'host' ? 'Вы ведущий' : room.you.kind === 'spectator' ? 'Вы зритель' : 'Вы игрок';
 
   return `<div class="screen lobby">
-    <div class="top"><div class="top-left"><span class="eyebrow">${who}${room.you.owner && room.you.kind !== 'host' ? ' и создатель стола' : ''}</span><h1>Собираем стол</h1></div></div>
+    <div class="top"><div class="top-left"><span class="eyebrow">${who}${room.you.owner && room.you.kind !== 'host' ? ' и создатель стола' : ''}</span><h1>Собираем стол</h1></div>${menuButton()}</div>
     ${lobbyTable(store)}
     <div class="card accent invite">
       <div class="invite-code"><span class="eyebrow">Код стола</span><span class="code-big">${esc(room.code)}</span></div>
@@ -70,6 +70,5 @@ export function renderLobby(store: Store): string {
       ${players.length < MAX_PLAYERS ? `<button class="btn ghost small" data-act="addBots">Добрать ботами до ${MAX_PLAYERS} (+${MAX_PLAYERS - players.length})</button>` : ''}
     </div>` : `<p class="hint center">${composition(players.length)}. Ждём, пока создатель стола раздаст карты, места разыграются случайно.</p>`}
     ${spectators.length ? `<div class="spectators"><span class="k">Зрители</span><span class="faces">${spectators.slice(0, 8).map((m) => `<span title="${esc(m.nick)}">${memberAvatar(m, 26)}</span>`).join('')}${spectators.length > 8 ? `<small>+${spectators.length - 8}</small>` : ''}</span></div>` : ''}
-    ${exitButtons(store)}
   </div>`;
 }

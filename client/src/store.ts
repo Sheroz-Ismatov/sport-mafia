@@ -32,7 +32,9 @@ export interface Store {
   hostSeat: number | null; // ведущий открыл окно места: фолы, удаление, ППК
   showLog: boolean;
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
-  disbandArmed: boolean; // «Распустить стол» нажато один раз, ждём подтверждения
+  menu: boolean;                         // открыто меню стола «⋯»
+  confirm: 'leave' | 'disband' | null;   // окно подтверждения выхода или роспуска
+  sound: boolean;                        // звуковой сигнал «твоя очередь»
   prevSession: Session | null; // запомненная игра, когда открыли ссылку на другой стол
   // аккаунт
   config: ApiConfig | null;      // что умеет сервер: Telegram, статистика
@@ -98,7 +100,9 @@ export const store: Store = {
   hostSeat: null,
   showLog: false,
   cardHidden: false,
-  disbandArmed: false,
+  menu: false,
+  confirm: null,
+  sound: load<boolean>('mafia.sound', true),
   prevSession: null,
   config: null,
   account: miniAppInitData ? null : load<Account | null>('mafia.account', null),
