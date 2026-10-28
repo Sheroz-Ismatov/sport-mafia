@@ -67,7 +67,7 @@ function controlCard(store: Store, game: GameView): string {
 
   return `<div class="card accent">
     <div class="row"><div class="stack" style="gap:2px;min-width:0"><span class="eyebrow">${label}</span><b class="ctl-who">${who}</b></div>
-      <span class="clock ctl-clock" data-clock style="color:${paused ? 'var(--amber)' : 'var(--blue)'}">${left === null ? '' : clock(left)}</span></div>
+      <span class="clock ctl-clock" data-clock style="color:${paused ? 'var(--amber)' : 'var(--accent)'}">${left === null ? '' : clock(left)}</span></div>
     ${paused ? '<p class="hint" style="color:var(--amber)">Пауза. Микрофон говорящего остаётся включённым.</p>' : ''}
     ${extra}
     <div class="grid3 controls">
