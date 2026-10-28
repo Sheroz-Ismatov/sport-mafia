@@ -174,6 +174,15 @@ export function renderHost(store: Store): string {
   const pane = (name: string, html: string) =>
     `<div class="host-pane stack" style="display:${tab === name ? 'flex' : 'none'};gap:14px">${html}</div>`;
 
+  // Конец партии: у ведущего тот же финал, что у игроков, без пульта
+  if (game.phase === 'ended') {
+    return `<div class="screen">
+      <div class="top"><div class="top-left"><span class="eyebrow">Стол ${esc(room.code)} · ты ведущий</span><h1>${phaseTitle(game)}</h1></div>${menuButton()}</div>
+      ${finaleCard(store, game)}
+      ${logCard(game, true, false)}
+    </div>`;
+  }
+
   // Шапка, таймер с кнопками и вкладки закреплены сверху: прокручивается только то, что ниже
   return `<div class="screen wide">
     <div class="host-sticky">
