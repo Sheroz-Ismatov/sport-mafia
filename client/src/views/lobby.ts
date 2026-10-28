@@ -47,7 +47,7 @@ function inviteCard(store: Store, link: string, tgLink: string | null, main: boo
   const buttons = tgLink
     ? `<div class="grid2">
         <button class="btn small ${p}" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать друзей' : 'Ссылка в Telegram'}</button>
-        <button class="btn small" data-act="invite" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
+        <button class="btn small" data-act="invite" data-spectator="1" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
       </div>
       <button class="btn small ghost" data-act="copyLink" data-v="${esc(link)}">Ссылка для браузера</button>`
     : `<div class="grid2">

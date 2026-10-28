@@ -14,7 +14,7 @@ import { randomQuoteIndex } from './quotes.ts';
 import { pickMode, renderPlay } from './views/play.ts';
 import { markTalking, renderVoice } from './views/voice.ts';
 import { VoiceClient } from './voice.ts';
-import { api, haptic, inTelegram, miniAppInitData, mountLoginWidget, parseStartParam, setBackButton, setupMiniApp, shareInTelegram } from './tg.ts';
+import { api, haptic, inTelegram, inviteViaBot, miniAppInitData, mountLoginWidget, parseStartParam, setBackButton, setupMiniApp, shareInTelegram } from './tg.ts';
 import type { GameView } from '../../engine/index.ts';
 import type { Account } from './tg.ts';
 import { renderProfile } from './views/profile.ts';
@@ -64,7 +64,12 @@ function onMessage(msg: ServerMessage): void {
       // Свою карту только что взяли: когда она перевернётся, обновим плашку с ролью
       if (msg.game?.phase === 'deal' && dealtAt !== null && dealtAt !== prev) setTimeout(render, 1600);
       feel(store.game, msg.game);
-      if (!store.room) { store.sheet = null; store.screen = 'main'; }
+      if (!store.room) {
+        if (store.gathering) toast('Стол открыт, бот зовёт всех, кто записался на сбор');
+        store.sheet = null;
+        store.screen = 'main';
+        store.gathering = null;
+      }
       store.room = msg.room;
       store.game = msg.game;
       voice.update(msg.room);
@@ -410,7 +415,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; pressOnly(el); },
   create: (el) => {
     if (!store.nick.trim()) return fieldError('nick', 'Введи ник, чтобы сесть за стол');
-    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session, gender: store.gender });
+    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session, gender: store.gender, gathering: store.gathering ?? undefined });
   },
   restart: () => net.send({ t: 'restart' }),
   card: (el) => act({ type: 'pickCard', index: num(el) }),
@@ -437,6 +442,9 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   },
   invite: (el) => {
     const link = el.dataset.v ?? '';
+    // Карточка от бота с картинкой и кнопкой вместо голой ссылки
+    const code = store.room?.code;
+    if (inTelegram && code && store.config?.telegram?.inline && inviteViaBot(code + (el.dataset.spectator ? '-s' : ''))) return;
     if (inTelegram && shareInTelegram(link, 'Садись за стол: спортивная мафия')) return;
     handlers.copyLink(el);
   },

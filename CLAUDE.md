@@ -29,15 +29,21 @@ Node 22.18+ запускает TypeScript напрямую (импорты с `.
 - `client/` чистый TS + innerHTML, события через `data-act`. `build.ts` (esbuild → `client/dist`, копирует `src/img` и `src/fonts`, собирает голос в `dist/lk/` если стоят livekit-client и Krisp). `src/main.ts`, `store.ts`, `net.ts`, `voice.ts`, `tg.ts` (Mini App, вибрация с запасным navigator.vibrate, BackButton, API), `attention.ts` (Wake Lock, звуковой сигнал Web Audio), `art.ts`, `quotes.ts` (30 фраз), `views/`: `home.ts`, `lobby.ts` (круглый стол, одна главная кнопка), `play.ts` (шапка с плиткой своего номера, голосование одной карточкой, записка семьи), `action.ts` (панель действия внизу), `host.ts` (закреплённая шапка, стол и окно места с фолами), `table.ts` (метки, прицел цели, долгое нажатие), `cards.ts`, `finale.ts`, `profile.ts`, `rules.ts`, `voice.ts`, `exit.ts` (меню «⋯» и подтверждения выхода и роспуска).
 - Шрифты: `client/src/fonts/` Rubik и Unbounded (вариативные woff2, кириллица и латиница, OFL), сервер отдаёт `/fonts/*.woff2`. Google Fonts не используем.
 - Нижние окна (`.sheet`) выезжают только при открытии: ключ окна в `sheetKey()` в main.ts. Высоты плашки голоса и панели действия пишутся в CSS-переменные `--voice-off` и `--bar-h`.
+- Бот Дона `server/bot/`: `bot.ts` (webhook-обработчик: /start с вопросом об опыте и туром для новичка, меню, команды /play /sbor /rules /stats /fraza /fraza_on /fraza_off /help; сборы с выбором времени, отметками Буду/Может быть/Не смогу, запасом после 10, отменой в два нажатия; напоминания за час и за 10 минут в личку; стол из сбора; inline-карточки стола и сбора; фраза дня в 19:00 по поясу чата), `store.ts` (BotStore: память или Postgres, таблицы bot_users, bot_chats, gatherings, gathering_members, gathering_posts), `time.ts` (разбор «пт 21:00», пояса Душанбе/Москва/Ташкент/Алматы), `jokes.ts` (56 текстов: цитаты, байки, советы, протокол), `tgapi.ts`.
+- Webhook: `POST /tg/<webhookSecret(token)>` с заголовком секрета; при старте на Render `setup()` ставит webhook на `RENDER_EXTERNAL_URL` (или `PUBLIC_URL`), меню команд и описание. Таймер бота в startServer раз в 30 с. Пока есть открытые сборы или подписчики фразы дня, сервер раз в 10 минут стучится к себе, чтобы бесплатный Render не засыпал.
+- Стол из сбора: ссылка `startapp=G<id>` открывает окно «Стол для сбора», `create{gathering}`; сервер вызывает `bot.roomOpened`, бот зовёт всех «Буду» и «Может быть». `startapp=rules` открывает правила. Кнопка «Позвать друзей» в лобби внутри Telegram открывает inline-карточку (`switchInlineQuery`), если в BotFather включён inline.
+- Картинки бота: `img/tg-don.jpg` (приветствие), `img/tg-invite.jpg` (баннер карточек).
 - Картинки: `client/src/img/` (don, mafia, sheriff, back .webp; мирные: civilian, civilian-barber, -driver, -fisher, -priest, -accordion, -chef; logo.webp; favicon, иконки). Карты 496×752 webp.
 - Рисунки по полу: `client/src/art.ts` (колоды CATS и KITTIES по ролям, `roleArt`, `seatArt`). Игрок выбирает «Парень / Девушка / Трансформер» рядом с ником (`gender` в create/join, хранится в localStorage). Сервер на старте раздаёт каждому месту случайный номер `art` (перестановка, роль не выдаёт); клиент берёт рисунок из колоды по полу и номеру. Колода кошек пока пустая: девушкам выпадают коты, трансформеру обе колоды. Боты с полом по имени.
-- Протокол WS: `create{nick,as,session,gender}`, `join{code,nick,as,session,gender}`, `resume`, `addBots`, `start`, `restart`, `act`, `leave`, `disband`, `voice`, `voiceJoined`, `ping`. Ответы: `welcome`, `state{now,room,game}`, `voice`, `error{code?:'room_gone'}`, `closed`.
+- Протокол WS: `create{nick,as,session,gender,gathering}`, `join{code,nick,as,session,gender}`, `resume`, `addBots`, `start`, `restart`, `act`, `leave`, `disband`, `voice`, `voiceJoined`, `ping`. Ответы: `welcome`, `state{now,room,game}`, `voice`, `error{code?:'room_gone'}`, `closed`.
 
 ## Переменные на Render
-`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_APP_NAME=play`, `DATABASE_URL`. Без любой группы игра работает, просто без этой функции.
+`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_APP_NAME=play`, `DATABASE_URL`. Без любой группы игра работает, просто без этой функции. Необязательные: `BOT_TZ` (пояс по умолчанию, иначе Asia/Dushanbe), `PUBLIC_URL` (если не Render).
+- BotFather: `/setinline` (включить inline, подсказка «код стола или сбор»), группы разрешены (`/setjoingroups`). Режим приватности в группах не трогать: бот видит команды и ответы на свои сообщения.
 
 ## Проверка
-- `npm test` (42 теста: движок, сервер, голос, вход, аккаунты), `npm run typecheck`.
+- `npm test` (51 тест: движок, сервер, голос, вход, аккаунты, бот), `npm run typecheck`.
+- Хранилище бота на настоящем Postgres: локальный сервер из /usr/lib/postgresql/16/bin (initdb под отдельным пользователем) и клиент `SQL` из Bun вместо пакета pg.
 - Тест базы на настоящем Postgres: `TEST_DATABASE_URL=postgres://... npm test`.
 - Быстрые таймеры: `TIMER_SCALE=0.15 node server/index.ts`.
 - В облачной среде Claude npm закрыт: livekit-client, Krisp и pg ставятся только на Render. Для локальных тестов: `ws` клоном с GitHub в node_modules, esbuild собирается Go из исходников (x/sys клоном с GitHub через replace) с JS-обёрткой, @types/node и @types/ws из DefinitelyTyped (sparse clone). Playwright с Chromium из /opt/pw-browsers; поддельные переменные LiveKit показывают плашку голоса.
@@ -47,11 +53,12 @@ Node 22.18+ запускает TypeScript напрямую (импорты с `.
 ## Состояние (28.10.2026, после UX-PLAN)
 Готово: правила и движок, ведущий и игра без ведущего, голос LiveKit + Krisp, роспуск стола, вход через Telegram и статистика, профиль, карты с котиками, рубашка, логотип, новый главный экран (фразы Дона, окна «Создать стол»/«Войти по коду»), «Как играть», лобби-стол с аватарками, аватарки на местах, вибрация и «Назад» в Telegram, экран конца партии, 7 разных мирных котов (парикмахер, таксист, рыбак, падре, аккордеонист, повар и прежний с хлебом), выбор пола. Всё на Render, у Лео работает.
 Сделан весь план UX-PLAN.md: панель действия внизу (A1), стол ведущего с окном места (A2), меню «⋯» и подтверждение выхода (A3), экран не гаснет, звук и вибрация (A4), палитра золото/красный/чёрный, бордовая ночь (B1), заставка «Город засыпает», прицел цели, шаг ночи в центре (B2), голосование одной карточкой (B3), читаемые места, точка выставления, долгое нажатие (B4), записка семьи свёрнута днём (B5), финал ведущего без пульта (B6), одна главная кнопка в лобби (B7), везде «ты» с окончаниями по полу (C1), свои шрифты (C2), подсказка про голос только локально (C3), крупный свой номер с прячущейся ролью (C4). Осталось: живая партия в Telegram с друзьями.
+Бот (28.10): знакомство с выбором опыта, меню команд, сборы с напоминаниями, фраза дня, карточки приглашения. Нужно включить inline в BotFather.
 
 ## Идеи на потом (не утверждены)
 - Котики-девушки: Лео пришлёт рисунки, добавить в KITTIES в `client/src/art.ts` (можно и для шерифа, мафии, дона).
 - Сохранять столы в базу, чтобы перезапуск сервера не обрывал партии; платный Render, чтобы не засыпал.
-- Бот отвечает на /start приветствием и кнопкой «Играть», уведомления.
+- Бот: уведомление «через минуту твоя речь», итог партии в личку, рейтинг чата, перенос времени сбора.
 - Список открытых столов, рейтинг и ачивки (когда будет больше игроков).
 - Выбор микрофона в плашке голоса, выгнать игрока из лобби.
 - Боты не задают план отстрела за дона: прицел цели у чёрных виден, только когда дон живой человек.

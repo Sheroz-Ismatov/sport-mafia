@@ -3,7 +3,7 @@
 import type { GameView } from '../../engine/index.ts';
 import type { ApiConfig, Gender, RoomInfo } from '../../server/protocol.ts';
 import type { Account, Stats } from './tg.ts';
-import { miniAppInitData, parseStartParam } from './tg.ts';
+import { miniAppInitData, parseLaunchExtra, parseStartParam } from './tg.ts';
 import { randomQuoteIndex } from './quotes.ts';
 
 export interface Session { code: string; token: string }
@@ -45,6 +45,7 @@ export interface Store {
   autoJoin: boolean;             // открыли приглашение в Telegram: сесть за стол сразу
   screen: 'main' | 'profile' | 'rules';
   sheet: 'create' | 'join' | null; // выезжающее окно на главном экране
+  gathering: number | null;         // открыли из бота «Открыть стол для сбора»: бот позовёт записавшихся
   quote: number;                    // какая фраза Дона на главном экране
   profile: { stats: Stats | null; error: string | null; loading: boolean };
 }
@@ -75,7 +76,7 @@ const tgLaunch = (() => {
   try {
     const p = new URLSearchParams(miniAppInitData);
     const user = JSON.parse(p.get('user') ?? '{}') as { first_name?: string };
-    return { name: (user.first_name ?? '').slice(0, 24), invite: parseStartParam(p.get('start_param')) };
+    return { name: (user.first_name ?? '').slice(0, 24), invite: parseStartParam(p.get('start_param')), ...parseLaunchExtra(p.get('start_param')) };
   } catch {
     return null;
   }
@@ -112,8 +113,9 @@ export const store: Store = {
   account: miniAppInitData ? null : load<Account | null>('mafia.account', null),
   authPending: miniAppInitData !== null,
   autoJoin: !!tgLaunch?.invite,
-  screen: 'main',
-  sheet: null,
+  screen: tgLaunch?.rules ? 'rules' : 'main',
+  sheet: tgLaunch?.gathering ? 'create' : null,
+  gathering: tgLaunch?.gathering ?? null,
   quote: randomQuoteIndex(),
   profile: { stats: null, error: null, loading: false },
 };

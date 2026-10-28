@@ -80,7 +80,8 @@ function sheet(store: Store): string {
   if (!store.sheet) return '';
   let body: string;
   if (store.sheet === 'create') {
-    body = `<h2>Новый стол</h2>
+    body = `<h2>${store.gathering ? 'Стол для сбора' : 'Новый стол'}</h2>
+      ${store.gathering ? '<p class="note">Как только создашь стол, бот позовёт всех, кто записался на сбор.</p>' : ''}
       ${nickField(store)}
       <button type="button" class="choice" data-act="create" data-v="host">
         <img src="/img/logo.webp" alt=""><span><b>Я ведущий</b><small>Веду игру: вижу все роли, слежу за временем, даю фолы</small></span></button>

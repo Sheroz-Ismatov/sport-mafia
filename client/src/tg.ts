@@ -23,6 +23,7 @@ interface TgWebApp {
   setHeaderColor?(color: string): void;
   setBackgroundColor?(color: string): void;
   openTelegramLink(url: string): void;
+  switchInlineQuery?(query: string, chatTypes?: ('users' | 'bots' | 'groups' | 'channels')[]): void;
   disableVerticalSwipes?(): void;
   HapticFeedback?: {
     impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
@@ -111,6 +112,26 @@ export function shareInTelegram(link: string, text: string): boolean {
   if (!webApp) return false;
   webApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   return true;
+}
+
+/**
+ * Позвать друзей карточкой от бота: Telegram открывает выбор чата и вставляет карточку
+ * с картинкой и кнопкой «Сесть за стол». Работает, если у бота включён inline-режим.
+ */
+export function inviteViaBot(query: string): boolean {
+  if (!webApp?.switchInlineQuery) return false;
+  try {
+    webApp.switchInlineQuery(query, ['users', 'groups']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Дополнительные параметры запуска из бота: G12 — стол для сбора №12, rules — сразу правила. */
+export function parseLaunchExtra(p: string | null): { gathering: number | null; rules: boolean } {
+  const g = /^G(\d+)$/.exec(p ?? '');
+  return { gathering: g ? Number(g[1]) : null, rules: p === 'rules' };
 }
 
 /** Код стола из приглашения t.me/бот/игра?startapp=MAF-1234 (зрителем: MAF-1234-s). */
