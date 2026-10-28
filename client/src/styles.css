@@ -100,6 +100,12 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .field label { font-size: 13px; font-weight: 600; color: var(--muted); }
 .field input { height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--seat); color: var(--text); padding: 0 14px; font-size: 16px; }
 .field input:focus { border-color: var(--blue); outline: none; }
+.field.invalid label { color: var(--red-soft); }
+.field.invalid input, .field.invalid input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(240, 86, 91, .22); }
+.field-error { color: var(--red-soft); font-size: 13px; font-weight: 600; }
+.field.shake input { animation: shake .35s ease; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .field.shake input { animation: none; } }
 .code-input { text-transform: uppercase; letter-spacing: .08em; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .seg.three { grid-template-columns: 1fr 1fr 1fr; }

@@ -81,6 +81,10 @@ function onMessage(msg: ServerMessage): void {
         store.code = '';
         if (!wasHere) return render();
       }
+      if (store.sheet === 'join' && !store.room && /не найдена/i.test(msg.message)) {
+        fieldError('code', 'Такого стола нет. Проверь код');
+        return;
+      }
       toast(msg.message);
       return;
     case 'closed':
@@ -303,6 +307,18 @@ setInterval(() => {
 
 // ---------- Нажатия ----------
 
+/** Подсветить поле в окне входа красным и написать под ним, что не так. */
+function fieldError(field: 'nick' | 'code', text: string): void {
+  store.fieldError = { ...store.fieldError, [field]: text };
+  haptic('alert');
+  render();
+  const input = root.querySelector<HTMLInputElement>(`#${field}`);
+  input?.focus();
+  input?.closest('.field')?.classList.remove('shake');
+  void input?.offsetWidth; // перезапуск анимации, если ошибка повторилась
+  input?.closest('.field')?.classList.add('shake');
+}
+
 /** Переключатель из нескольких кнопок: отмечаем нажатую на месте, без перерисовки экрана. */
 function pressOnly(el: HTMLElement): void {
   el.parentElement?.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
@@ -321,15 +337,21 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   },
   joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; pressOnly(el); },
   create: (el) => {
-    if (!store.nick.trim()) return toast('Введите ник');
+    if (!store.nick.trim()) return fieldError('nick', 'Введи ник, чтобы сесть за стол');
     net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session, gender: store.gender });
   },
   restart: () => net.send({ t: 'restart' }),
   card: (el) => act({ type: 'pickCard', index: num(el) }),
   flipCard: () => { store.cardHidden = !store.cardHidden; render(); },
   join: () => {
-    if (!store.nick.trim()) return toast('Введите ник');
-    if (!store.code.trim()) return toast('Введите код комнаты');
+    const nickMissing = !store.nick.trim();
+    const codeMissing = !store.code.trim();
+    if (nickMissing || codeMissing) {
+      store.fieldError = {};
+      if (codeMissing) fieldError('code', 'Введи код стола, например MAF-4821');
+      if (nickMissing) fieldError('nick', 'Введи ник, чтобы сесть за стол');
+      return;
+    }
     net.send({ t: 'join', code: store.code.trim().toUpperCase(), nick: store.nick, as: store.joinAs, session: store.account?.session, gender: store.gender });
   },
   copyLink: async (el) => {
@@ -356,12 +378,13 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   profileBack: () => { store.screen = 'main'; render(); },
   sheet: (el) => {
     store.sheet = el.dataset.v === 'join' ? 'join' : 'create';
+    store.fieldError = {};
     render();
     // На телефоне сразу открываем клавиатуру там, где нужно ввести
     const input = root.querySelector<HTMLInputElement>(store.sheet === 'join' && store.nick.trim() ? '#code' : '#nick');
     if (input && !(store.sheet === 'join' && store.code)) input.focus();
   },
-  sheetClose: () => { store.sheet = null; render(); },
+  sheetClose: () => { store.sheet = null; store.fieldError = {}; render(); },
   nextQuote: () => { store.quote = randomQuoteIndex(store.quote); render(); },
   rules: () => { store.screen = 'rules'; store.sheet = null; render(); window.scrollTo(0, 0); },
   rulesBack: () => { store.screen = 'main'; render(); window.scrollTo(0, 0); },
@@ -496,6 +519,13 @@ voiceRoot.addEventListener('click', (e) => {
 root.addEventListener('input', (e) => {
   const input = e.target as HTMLInputElement;
   const model = input.dataset.model;
+  // Начал печатать: убираем красную подсказку на месте, без перерисовки
+  if ((model === 'nick' || model === 'code') && store.fieldError[model]) {
+    delete store.fieldError[model];
+    const field = input.closest('.field');
+    field?.classList.remove('invalid', 'shake');
+    field?.querySelector('.field-error')?.remove();
+  }
   if (model === 'nick') {
     store.nick = input.value;
     save('mafia.nick', input.value.trim());

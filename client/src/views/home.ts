@@ -67,8 +67,10 @@ function loginCard(store: Store): string {
 }
 
 function nickField(store: Store): string {
-  return `<div class="field"><label for="nick">Как тебя называть за столом</label>
-    <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
+  const err = store.fieldError.nick;
+  return `<div class="field${err ? ' invalid' : ''}"><label for="nick">Как тебя называть за столом</label>
+    <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"${err ? ' aria-invalid="true"' : ''}>
+    ${err ? `<small class="field-error" role="alert">${esc(err)}</small>` : ''}</div>
     <div class="field"><label>Кто ты</label>
       <div class="seg three" role="group" aria-label="Кто ты">${GENDERS.map((g) =>
         `<button type="button" data-act="gender" data-v="${g.v}" aria-pressed="${store.gender === g.v}">${g.label}</button>`).join('')}</div></div>`;
@@ -88,8 +90,9 @@ function sheet(store: Store): string {
   } else {
     body = `<h2>Войти по коду</h2>
       ${nickField(store)}
-      <div class="field"><label for="code">Код стола</label>
-        <input id="code" class="code-input" data-model="code" maxlength="12" value="${esc(store.code)}" placeholder="MAF-4821" autocapitalize="characters" inputmode="text"></div>
+      <div class="field${store.fieldError.code ? ' invalid' : ''}"><label for="code">Код стола</label>
+        <input id="code" class="code-input" data-model="code" maxlength="12" value="${esc(store.code)}" placeholder="MAF-4821" autocapitalize="characters" inputmode="text"${store.fieldError.code ? ' aria-invalid="true"' : ''}>
+        ${store.fieldError.code ? `<small class="field-error" role="alert">${esc(store.fieldError.code)}</small>` : ''}</div>
       <div class="seg" role="group" aria-label="Как войти">
         <button type="button" data-act="joinAs" data-v="player" aria-pressed="${store.joinAs === 'player'}">Игроком</button>
         <button type="button" data-act="joinAs" data-v="spectator" aria-pressed="${store.joinAs === 'spectator'}">Зрителем</button>

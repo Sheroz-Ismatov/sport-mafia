@@ -20,6 +20,7 @@ export interface Store {
   nick: string;
   gender: Gender; // парень, девушка или трансформер: от этого зависят рисунки карт
   code: string;
+  fieldError: { nick?: string; code?: string }; // подсказки прямо под полями в окне входа
   joinAs: 'player' | 'spectator';
   // выбор номеров за столом (выставить, выстрелить, проверить, лучший ход)
   selected: number[];
@@ -86,6 +87,7 @@ export const store: Store = {
   nick: load<string>('mafia.nick', '') || tgLaunch?.name || '',
   gender: load<Gender>('mafia.gender', 'm'),
   code: tgLaunch?.invite?.code ?? (params.get('room') ?? '').toUpperCase(),
+  fieldError: {},
   joinAs: tgLaunch?.invite ? (tgLaunch.invite.spectator ? 'spectator' : 'player') : params.get('as') === 'spectator' ? 'spectator' : 'player',
   selected: [],
   selectKey: '',
