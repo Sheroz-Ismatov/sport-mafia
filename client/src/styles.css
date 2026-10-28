@@ -576,3 +576,9 @@ body.has-voice .offline { bottom: var(--voice-off); }
 /* Записка семьи свёрнута */
 .memo-closed { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; padding: 0 14px; border-radius: 14px; background: #1F1B10; border: 1px dashed var(--gold); color: var(--soft); font: inherit; font-size: 14px; font-weight: 600; }
 .memo-closed b { color: var(--gold-soft); font-size: 13px; }
+
+/* Лобби: кнопка старта с подписью, сколько ещё нужно */
+.start-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; }
+.start-btn small { font-size: 12.5px; font-weight: 600; opacity: .85; }
+/* Включить голос: заметная, но не главная кнопка */
+.btn.voice-on { background: transparent; border-color: var(--gold); color: var(--gold-soft); }

@@ -28,7 +28,7 @@ function lobbyTable(store: Store): string {
     const cls = ['lseat'];
     if (m.id === room.you.id) cls.push('me');
     if (!m.connected) cls.push('off');
-    return `<div class="${cls.join(' ')}" style="${style}" data-vid="${esc(m.id)}">${memberAvatar(m, 34)}<small>${m.id === room.you.id ? 'вы' : esc(m.nick)}</small></div>`;
+    return `<div class="${cls.join(' ')}" style="${style}" data-vid="${esc(m.id)}">${memberAvatar(m, 34)}<small>${m.id === room.you.id ? 'ты' : esc(m.nick)}</small></div>`;
   }).join('');
   const need = Math.max(0, MIN_PLAYERS - players.length);
   return `<div class="table lobby-table">${seats}
@@ -36,8 +36,27 @@ function lobbyTable(store: Store): string {
       <span class="lbl">За столом</span>
       <span class="lobby-count">${players.length}<small>/${MAX_PLAYERS}</small></span>
       <span class="sub">${need ? `ещё ${need} до старта` : players.length < MAX_PLAYERS ? 'можно начинать' : 'стол полный'}</span>
-      ${host ? `<span class="lobby-host" data-vid="${esc(host.id)}">${memberAvatar(host, 22)}<small>ведущий ${host.id === room.you.id ? '(вы)' : esc(host.nick)}</small></span>` : ''}
+      ${host ? `<span class="lobby-host" data-vid="${esc(host.id)}">${memberAvatar(host, 22)}<small>ведущий ${host.id === room.you.id ? '(ты)' : esc(host.nick)}</small></span>` : ''}
     </div>
+  </div>`;
+}
+
+function inviteCard(store: Store, link: string, tgLink: string | null, main: boolean): string {
+  const room = store.room!;
+  const p = main ? 'primary' : '';
+  const buttons = tgLink
+    ? `<div class="grid2">
+        <button class="btn small ${p}" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать друзей' : 'Ссылка в Telegram'}</button>
+        <button class="btn small" data-act="invite" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
+      </div>
+      <button class="btn small ghost" data-act="copyLink" data-v="${esc(link)}">Ссылка для браузера</button>`
+    : `<div class="grid2">
+        <button class="btn small ${p}" data-act="copyLink" data-v="${esc(link)}">Позвать друзей</button>
+        <button class="btn small" data-act="copyLink" data-v="${esc(link + '&as=spectator')}">Для зрителей</button>
+      </div>`;
+  return `<div class="card invite${main ? ' accent' : ''}">
+    <div class="invite-code"><span class="eyebrow">Код стола</span><span class="code-big">${esc(room.code)}</span></div>
+    ${buttons}
   </div>`;
 }
 
@@ -48,24 +67,19 @@ export function renderLobby(store: Store): string {
   const tgLink = telegramLink(store.config, room.code);
   const players = room.members.filter((m) => m.kind === 'player');
   const spectators = room.members.filter((m) => m.kind === 'spectator');
-  const who = room.you.kind === 'host' ? 'Вы ведущий' : room.you.kind === 'spectator' ? 'Вы зритель' : 'Вы игрок';
+  const who = room.you.kind === 'host' ? 'Ты ведущий' : room.you.kind === 'spectator' ? 'Ты зритель' : 'Ты игрок';
+  const need = Math.max(0, MIN_PLAYERS - players.length);
+  const enough = need === 0;
+  // Одна главная кнопка: пока игроков мало, главное позвать друзей; когда хватает, раздать карты
+  const inviteMain = !isHost || !enough;
 
   return `<div class="screen lobby">
     <div class="top"><div class="top-left"><span class="eyebrow">${who}${room.you.owner && room.you.kind !== 'host' ? ' и создатель стола' : ''}</span><h1>Собираем стол</h1></div>${menuButton()}</div>
     ${lobbyTable(store)}
-    <div class="card accent invite">
-      <div class="invite-code"><span class="eyebrow">Код стола</span><span class="code-big">${esc(room.code)}</span></div>
-      ${tgLink ? `<div class="grid2">
-        <button class="btn small primary" data-act="invite" data-v="${esc(tgLink)}">${inTelegram ? 'Позвать друзей' : 'Ссылка в Telegram'}</button>
-        <button class="btn small" data-act="invite" data-v="${esc(telegramLink(store.config, room.code, true)!)}">Для зрителей</button>
-      </div>
-      <button class="btn small ghost" data-act="copyLink" data-v="${esc(link)}">Ссылка для браузера</button>` : `<div class="grid2">
-        <button class="btn small primary" data-act="copyLink" data-v="${esc(link)}">Скопировать ссылку</button>
-        <button class="btn small" data-act="copyLink" data-v="${esc(link + '&as=spectator')}">Для зрителей</button>
-      </div>`}
-    </div>
+    ${inviteCard(store, link, tgLink, inviteMain)}
     ${isHost ? `<div class="stack">
-      <button class="btn primary" data-act="start" ${players.length >= MIN_PLAYERS ? '' : 'disabled'}>Раздать карты</button>
+      <button class="btn ${inviteMain ? '' : 'primary'} start-btn" data-act="start" ${enough ? '' : 'disabled'}>
+        <b>Раздать карты</b>${enough ? '' : `<small>${need === 1 ? 'ещё 1 игрок' : need < 5 ? `ещё ${need} игрока` : `ещё ${need} игроков`}</small>`}</button>
       <p class="hint center">${composition(players.length)}</p>
       ${players.length < MAX_PLAYERS ? `<button class="btn ghost small" data-act="addBots">Добрать ботами до ${MAX_PLAYERS} (+${MAX_PLAYERS - players.length})</button>` : ''}
     </div>` : `<p class="hint center">${composition(players.length)}. Ждём, пока создатель стола раздаст карты, места разыграются случайно.</p>`}

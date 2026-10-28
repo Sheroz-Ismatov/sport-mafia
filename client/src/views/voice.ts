@@ -32,7 +32,7 @@ export function renderVoice(room: RoomInfo | null, game: GameView | null, v: Voi
 
   if (v.status === 'off' || v.status === 'error') {
     return `<div class="voice off" role="region" aria-label="Голос">
-      <button class="btn small primary" data-act="voiceOn">${listener ? EAR : MIC}<span>Включить голос</span></button>
+      <button class="btn small voice-on" data-act="voiceOn">${listener ? EAR : MIC}<span>Включить голос</span></button>
       ${v.error ? `<span class="voice-msg err">${esc(v.error)}</span>` : `<span class="voice-msg">${listener ? 'Чтобы слышать игру' : 'Чтобы говорить и слышать стол'}</span>`}
     </div>`;
   }
