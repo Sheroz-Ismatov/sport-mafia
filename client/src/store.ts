@@ -29,6 +29,7 @@ export interface Store {
   hostTab: 'table' | 'night' | 'log';
   ppkArmed: number | null;
   removeArmed: number | null;
+  hostSeat: number | null; // ведущий открыл окно места: фолы, удаление, ППК
   showLog: boolean;
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
   disbandArmed: boolean; // «Распустить стол» нажато один раз, ждём подтверждения
@@ -94,6 +95,7 @@ export const store: Store = {
   hostTab: 'table',
   ppkArmed: null,
   removeArmed: null,
+  hostSeat: null,
   showLog: false,
   cardHidden: false,
   disbandArmed: false,

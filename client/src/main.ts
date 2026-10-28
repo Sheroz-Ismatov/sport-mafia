@@ -217,8 +217,16 @@ function selectionKey(): string {
 
 let preloaded = '';
 window.addEventListener('resize', () => layoutBars());
-let shownSheet: Store['sheet'] = null;
+let shownSheet: string | null = null;
+
+/** Какое нижнее окно сейчас открыто: от этого зависит, выезжает ли оно заново. */
+function sheetKey(): string | null {
+  if (store.sheet) return store.sheet;
+  if (store.hostSeat) return `seat${store.hostSeat}`;
+  return null;
+}
 let shownBar = '';
+let shownScreen = '';
 
 /** Высоты нижних плашек (голос и панель действия) в CSS: панель встаёт над голосом, контент не прячется под ними. */
 function layoutBars(): void {
@@ -263,12 +271,19 @@ function render(): void {
   const caret = focused?.selectionStart ?? null;
 
   // Окно на главном экране выезжает только при открытии, а не при каждой перерисовке
-  const sheetEnter = store.sheet !== null && store.sheet !== shownSheet;
-  shownSheet = store.sheet;
+  const openSheet = sheetKey();
+  const sheetEnter = openSheet !== null && openSheet !== shownSheet;
+  shownSheet = openSheet;
   const sheetScroll = root.querySelector('.sheet')?.scrollTop ?? 0;
 
   document.body.classList.toggle('is-night', isNightLike(game) && room?.you.kind !== 'host');
   root.innerHTML = html;
+  // Сменился экран (главный, лобби, партия, финал): начинаем сверху, а не с прокрутки прошлого экрана
+  const screenId = !room ? `home-${store.screen}` : !game ? 'lobby' : game.phase === 'ended' ? 'final' : 'game';
+  if (screenId !== shownScreen) {
+    if (shownScreen !== '') window.scrollTo(0, 0);
+    shownScreen = screenId;
+  }
 
   const sheetEl = root.querySelector('.sheet');
   if (sheetEl) {
@@ -288,7 +303,7 @@ function render(): void {
   layoutBars();
 
   // Системная кнопка «Назад» в Telegram: закрыть окно, выйти из профиля или правил
-  if (!room && store.sheet) setBackButton(() => handlers.sheetClose(root));
+  if (sheetKey()) setBackButton(() => handlers.sheetClose(root));
   else if (!room && store.screen !== 'main') setBackButton(() => { store.screen = 'main'; render(); window.scrollTo(0, 0); });
   else setBackButton(null);
 
@@ -403,7 +418,14 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     const input = root.querySelector<HTMLInputElement>(store.sheet === 'join' && store.nick.trim() ? '#code' : '#nick');
     if (input && !(store.sheet === 'join' && store.code)) input.focus();
   },
-  sheetClose: () => { store.sheet = null; store.fieldError = {}; render(); },
+  sheetClose: () => {
+    store.sheet = null;
+    store.fieldError = {};
+    store.hostSeat = null;
+    store.removeArmed = null;
+    store.ppkArmed = null;
+    render();
+  },
   nextQuote: () => { store.quote = randomQuoteIndex(store.quote); render(); },
   rules: () => { store.screen = 'rules'; store.sheet = null; render(); window.scrollTo(0, 0); },
   rulesBack: () => { store.screen = 'main'; render(); window.scrollTo(0, 0); },
@@ -443,6 +465,13 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
 
   // Выбор номеров за столом
   seat: (el) => {
+    // Ведущий: нажатие на место открывает окно с фолами и удалением
+    if (store.room?.you.kind === 'host' && store.game) {
+      store.hostSeat = num(el);
+      store.removeArmed = null;
+      store.ppkArmed = null;
+      return render();
+    }
     const game = store.game;
     const mode = game && pickMode(game);
     const n = num(el);
@@ -488,7 +517,9 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     const n = num(el);
     if (store.removeArmed === n) {
       store.removeArmed = null;
-      return act({ type: 'remove', seat: n });
+      store.hostSeat = null;
+      act({ type: 'remove', seat: n });
+      return render();
     }
     store.removeArmed = n;
     store.ppkArmed = null;
@@ -498,7 +529,9 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     const n = num(el);
     if (store.ppkArmed === n) {
       store.ppkArmed = null;
-      return act({ type: 'ppk', seat: n });
+      store.hostSeat = null;
+      act({ type: 'ppk', seat: n });
+      return render();
     }
     store.ppkArmed = n;
     store.removeArmed = null;

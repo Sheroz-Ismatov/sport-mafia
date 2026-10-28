@@ -2,10 +2,11 @@
 
 import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
-import { NIGHT_STEP, ROLE_SHORT, clock, esc, isBlackRole, outText, phaseTitle, remainingMs, winnerText } from '../util.ts';
+import { NIGHT_STEP, ROLE_NAME, ROLE_SHORT, clock, esc, isBlackRole, outText, phaseTitle, remainingMs, winnerText } from '../util.ts';
 import { logCard } from './play.ts';
 import { exitButtons } from './exit.ts';
 import { finaleCard } from './finale.ts';
+import { renderTable } from './table.ts';
 
 function controlCard(store: Store, game: GameView): string {
   const left = remainingMs(game, store.offset);
@@ -104,6 +105,36 @@ function seatRows(store: Store, game: GameView): string {
   }).join('');
 }
 
+/** Окно места у ведущего: крупный «Фол +», рядом «Снять фол», ниже отдельно удаление и ППК с подтверждением. */
+function seatSheet(store: Store, game: GameView): string {
+  const n = store.hostSeat;
+  const s = n ? game.seats[n - 1] : null;
+  if (!s) return '';
+  const member = store.room?.members.find((m) => m.seat === s.seat);
+  const role = s.role;
+  const canAct = s.alive && game.phase !== 'ended' && game.phase !== 'deal';
+  const armedRemove = store.removeArmed === s.seat;
+  const armedPpk = store.ppkArmed === s.seat;
+  const status = !s.alive ? outText(s) : member && !member.connected ? 'не в сети' : '';
+  return `<div class="sheet-backdrop" data-act="sheetClose"></div>
+    <div class="sheet seat-sheet" role="dialog" aria-modal="true" aria-label="Место ${s.seat}">
+      <button type="button" class="sheet-close" data-act="sheetClose" aria-label="Закрыть">✕</button>
+      <div class="ss-head"><span class="mini r-${role ?? 'none'}">${s.seat}</span>
+        <div><h2>${esc(s.nick)}</h2><small class="t-${role ?? 'none'}">${role ? ROLE_NAME[role] : 'ждёт карту'}${status ? ` · ${status}` : ''}</small></div></div>
+      <div class="ss-fouls ${s.fouls >= 3 ? 'warn' : ''}"><span>Фолы</span><b>${s.fouls} из 4</b><span class="dots">${[0, 1, 2, 3].map((i) => `<i class="${i < s.fouls ? 'on' : ''}"></i>`).join('')}</span></div>
+      ${canAct ? `<div class="ss-main">
+        <button class="btn foul big-foul" data-act="foul" data-n="${s.seat}">Фол +</button>
+        <button class="btn" data-act="unfoul" data-n="${s.seat}" ${s.fouls ? '' : 'disabled'}>Снять фол</button>
+      </div>
+      <p class="hint">3-й фол: молчит ближайшую минуту. 4-й удаляет из игры, голосования в этот день не будет.</p>
+      <div class="ss-danger">
+        <button class="btn small ${armedRemove ? 'red' : 'outline-red'}" data-act="remove" data-n="${s.seat}">${armedRemove ? 'Точно удалить?' : 'Удалить'}</button>
+        <button class="btn small ${armedPpk ? 'red' : 'outline-red'}" data-act="ppk" data-n="${s.seat}">${armedPpk ? 'Точно ППК?' : 'ППК'}</button>
+      </div>
+      ${armedRemove || armedPpk ? '<p class="hint">Нажми ещё раз, чтобы подтвердить. Это не отменить.</p>' : ''}` : `<p class="hint">${game.phase === 'deal' ? 'Фолы можно давать после раздачи.' : 'Игрок уже не за столом.'}</p>`}
+    </div>`;
+}
+
 function nightCard(game: GameView): string {
   const h = game.host!;
   const rows: string[] = [];
@@ -138,26 +169,26 @@ export function renderHost(store: Store): string {
   const tab = store.hostTab;
   // Сводка по столу всегда на виду в закреплённой шапке
   const summary = dealing
-    ? `Карт роздано: <b>${game.seats.filter((s) => s.role).length} из ${game.seats.length}</b>`
-    : `Живых <b>${alive.length}</b> · красных <b class="t-civilian">${alive.length - blacks}</b> · чёрных <b>${blacks}</b>`;
+    ? `роздано <b>${game.seats.filter((s) => s.role).length} из ${game.seats.length}</b>`
+    : `живых <b>${alive.length}</b><br><b class="t-civilian">${alive.length - blacks}</b> красных · <b>${blacks}</b> чёрных`;
   const pane = (name: string, html: string) =>
     `<div class="host-pane stack" style="display:${tab === name ? 'flex' : 'none'};gap:14px">${html}</div>`;
 
   // Шапка, таймер с кнопками и вкладки закреплены сверху: прокручивается только то, что ниже
   return `<div class="screen wide">
     <div class="host-sticky">
-      <div class="top"><div class="top-left"><span class="eyebrow">Комната ${esc(room.code)} · вы ведущий</span>
+      <div class="top"><div class="top-left"><span class="eyebrow">Стол ${esc(room.code)} · ты ведущий${room.spectators ? ` · зрителей ${room.spectators}` : ''}</span>
         <h1>${phaseTitle(game)}</h1></div>
-        <span class="pill">${room.spectators} зрит.</span></div>
+        <span class="host-sum">${summary}</span></div>
       ${controlCard(store, game)}
       <div class="tabs" role="tablist" aria-label="Разделы панели">
         ${(['table', 'night', 'log'] as const).map((t) => `<button role="tab" data-act="tab" data-v="${t}" aria-selected="${tab === t}">${{ table: 'Стол', night: 'Ночь', log: 'Протокол' }[t]}</button>`).join('')}
       </div>
-      <div class="sticky-sum"><span class="k">За столом</span><span>${summary}</span></div>
     </div>
     <div class="host-grid">
-      ${pane('table', `<div class="stack">${seatRows(store, game)}</div>
-        <p class="hint">3-й фол: игрок молчит ближайшую минуту. 4-й фол удаляет его автоматически, голосование дня отменяется.</p>
+      ${pane('table', `${hostTable(store, game)}
+        <p class="hint center host-tap-hint">Нажми на место, чтобы дать фол или удалить игрока</p>
+        <div class="stack host-list">${seatRows(store, game)}</div>
         ${nominationsCard(game)}`)}
       <div class="stack" style="gap:14px">
         ${pane('night', dealing ? '<div class="card"><h2>Ночная информация</h2><p class="hint">Появится после раздачи</p></div>' : nightCard(game))}
@@ -165,5 +196,17 @@ export function renderHost(store: Store): string {
       </div>
     </div>
     ${exitButtons(store)}
-  </div>`;
+  </div>
+  ${seatSheet(store, game)}`;
+}
+
+function hostTable(store: Store, game: GameView): string {
+  const offline = new Set<number>();
+  const photos = new Map<number, string>();
+  for (const m of store.room?.members ?? []) {
+    if (!m.seat) continue;
+    if (!m.connected) offline.add(m.seat);
+    if (m.photo) photos.set(m.seat, m.photo);
+  }
+  return renderTable(game, { mySeat: null, selected: store.hostSeat ? [store.hostSeat] : [], canPick: () => true, offset: store.offset, photos, host: true, offline });
 }

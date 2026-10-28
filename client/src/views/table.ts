@@ -9,6 +9,8 @@ export interface TableOptions {
   canPick: ((n: number) => boolean) | null; // null — сейчас номера не выбираются
   offset: number;
   photos?: Map<number, string>; // фото из Telegram по номеру места
+  host?: boolean;               // стол ведущего: все роли открыты, на местах ники и метки
+  offline?: Set<number>;        // места, чьи игроки сейчас не в сети
 }
 
 const serverNow = (offset: number) => Date.now() + offset;
@@ -61,8 +63,9 @@ export function renderTable(game: GameView, o: TableOptions): string {
     if (s.role && isBlackRole(s.role)) {
       cls.push('black');
       if (s.role === 'don') cls.push('don');
-      if (s.seat !== o.mySeat) sub = ROLE_SHORT[s.role];
+      if (s.seat !== o.mySeat && !o.host) sub = ROLE_SHORT[s.role];
     }
+    if (o.host && s.role === 'sheriff') cls.push('sheriff');
     if (s.seat === o.mySeat) {
       cls.push('me');
       sub = 'вы';
@@ -84,10 +87,15 @@ export function renderTable(game: GameView, o: TableOptions): string {
     const got = game.phase === 'deal' && s.dealtAt !== null
       ? `<span class="got" style="animation-delay:${s.dealtAt - serverNow(o.offset)}ms"></span>`
       : '';
-    const label = `Место ${s.seat}, ${s.nick}${s.alive ? '' : ', ' + outText(s)}${s.fouls ? `, фолов ${s.fouls}` : ''}`;
+    let tag = '';
+    if (o.host && s.alive && game.phase !== 'ended') {
+      if (o.offline?.has(s.seat)) tag = '<span class="tag off">не в сети</span>';
+      else if (cls.includes('speaking')) tag = '<span class="tag">говорит</span>';
+    }
+    const label = `Место ${s.seat}, ${s.nick}${o.host && s.role ? ', ' + ROLE_SHORT[s.role] : ''}${s.alive ? '' : ', ' + outText(s)}${s.fouls ? `, фолов ${s.fouls}` : ''}`;
     return `<button type="button" class="${cls.join(' ')}" style="left:${pos.left}%;top:${pos.top}%"
       data-act="seat" data-n="${s.seat}" data-vseat="${s.seat}" ${pickable ? '' : 'disabled'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
-      ${photo ? `<span class="nrow"><span class="sav"><img src="${esc(photo)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></span><span class="n">${s.seat}</span></span>` : `<span class="n">${s.seat}</span>`}<span class="s">${sub}</span><span class="f">${fouls}</span>${got}</button>`;
+      ${photo ? `<span class="nrow"><span class="sav"><img src="${esc(photo)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></span><span class="n">${s.seat}</span></span>` : `<span class="n">${s.seat}</span>`}<span class="s">${sub}</span><span class="f">${fouls}</span>${got}${tag}</button>`;
   }).join('');
   return `<div class="table">${seats}<div class="table-center">${centerHtml(game, o.offset)}</div></div>`;
 }
