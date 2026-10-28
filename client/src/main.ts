@@ -509,6 +509,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     store.code = '';
     render();
   },
+  toggleRole: () => { store.roleHidden = !store.roleHidden; save('mafia.roleHidden', store.roleHidden); render(); },
   memo: () => { store.memoOpen = !store.memoOpen; render(); },
   toggleLog: () => { store.showLog = !store.showLog; render(); },
 

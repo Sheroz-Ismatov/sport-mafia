@@ -31,6 +31,7 @@ export interface Store {
   removeArmed: number | null;
   hostSeat: number | null; // ведущий открыл окно места: фолы, удаление, ППК
   showLog: boolean;
+  roleHidden: boolean; // своя роль в шапке скрыта (вдруг кто-то смотрит в экран)
   memoOpen: boolean; // записка семьи у чёрных развёрнута днём (сворачивается при смене фазы)
   cardHidden: boolean; // своя карта на раздаче перевёрнута рубашкой вверх
   menu: boolean;                         // открыто меню стола «⋯»
@@ -101,6 +102,7 @@ export const store: Store = {
   hostSeat: null,
   showLog: false,
   memoOpen: false,
+  roleHidden: load<boolean>('mafia.roleHidden', false),
   cardHidden: false,
   menu: false,
   confirm: null,

@@ -2,7 +2,7 @@
 
 import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
-import { ROLE_NAME, byGender, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
+import { ROLE_NAME, ROLE_SHORT, byGender, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
 import { menuButton } from './exit.ts';
 import { finaleCard } from './finale.ts';
@@ -46,28 +46,33 @@ export function pickMode(game: GameView): PickMode | null {
   return null;
 }
 
+const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+/** Шапка игрока: крупно свой номер и роль (роль прячется по нажатию), фаза, меню. */
 function header(store: Store, game: GameView): string {
   const room = store.room!;
-  let badge = '';
   // Пока своя карта переворачивается, плашка не подсказывает роль раньше времени
   const myDealtAt = game.mySeat ? game.seats[game.mySeat - 1]?.dealtAt ?? null : null;
   const flipping = game.phase === 'deal' && myDealtAt !== null && Date.now() + store.offset - myDealtAt < 1500;
+  let tile: string;
+  let status: string;
   if (game.me && !flipping) {
     const role = game.me.role;
-    badge = `<div class="badge"><div class="mini r-${role}">${game.me.seat}</div>
-      <div class="bt"><small>${game.me.alive ? 'Твоя карта' : byGender(store.gender, 'Ты выбыл', 'Ты выбыла')}</small><b class="t-${role}">${ROLE_NAME[role]}</b></div></div>`;
+    const hidden = store.roleHidden;
+    tile = `<button type="button" class="seat-tile r-${hidden ? 'none' : role}" data-act="toggleRole" aria-label="${hidden ? 'Показать роль' : 'Скрыть роль'}">
+      <span class="n">${game.me.seat}</span><small>${hidden ? 'скрыто' : ROLE_SHORT[role]}</small><i class="peek">${EYE}</i></button>`;
+    status = game.me.alive ? (hidden ? 'роль скрыта' : 'твоё место') : byGender(store.gender, 'ты выбыл', 'ты выбыла');
   } else if (game.mySeat) {
-    badge = `<div class="badge"><div class="mini r-none">${game.mySeat}</div>
-      <div class="bt"><small>Твоё место</small><b>${flipping ? 'Смотри карту' : 'Карта не выбрана'}</b></div></div>`;
+    tile = `<div class="seat-tile r-none"><span class="n">${game.mySeat}</span><small>${flipping ? 'смотри' : 'нет карты'}</small></div>`;
+    status = 'твоё место';
   } else {
-    badge = `<div class="badge"><div class="mini r-none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
-      <div class="bt"><small>Наблюдатель</small><b>${room.spectators} в зале</b></div></div>`;
+    tile = `<div class="seat-tile r-none">${EYE}<small>${room.spectators}</small></div>`;
+    status = 'ты наблюдатель';
   }
-  return `<div class="top"><div class="top-left"><span class="eyebrow">Стол ${esc(room.code)}</span>
-    <h1>${phaseTitle(game)}</h1></div>${badge}${menuButton()}</div>`;
+  return `<div class="top me-top">${tile}<div class="top-left"><span class="eyebrow">Стол ${esc(room.code)} · ${status}</span>
+    <h1>${phaseTitle(game)}</h1></div>${menuButton()}</div>`;
 }
 
-/** Записка семьи: днём свёрнута (вдруг кто-то видит экран), ночью открыта сама. */
 function mafiaMemo(store: Store, game: GameView): string {
   const m = game.mafia;
   if (!m) return '';
@@ -336,7 +341,9 @@ export function renderPlay(store: Store): string {
   if (me?.alive && game.phase !== 'zeroNight' && game.phase !== 'ended') parts.push(mafiaMemo(store, game));
   parts.push(checksCard(game));
   parts.push(infoCard(game));
-  if (!store.room?.voice && !['ended', 'zeroNight', 'deal'].includes(game.phase)) {
+  // Служебная подсказка только при разработке на своём компьютере, игрокам на сервере не показываем
+  const devHost = ['localhost', '127.0.0.1'].includes(location.hostname);
+  if (devHost && !store.room?.voice && !['ended', 'zeroNight', 'deal'].includes(game.phase)) {
     parts.push('<p class="hint">Голос на этом сервере не настроен: для проверки созвонитесь в любом мессенджере.</p>');
   }
   parts.push(logCard(game, store.showLog || game.phase === 'ended'));
