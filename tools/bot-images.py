@@ -415,12 +415,13 @@ def stats():
     save(im, 'stats')
 
 
-def fraza(name, who, title):
+def fraza(name, who, title, big):
+    """Карточка фразы: сверху жанр, крупно кто говорит (или что это за история), рядом его портрет."""
     im = background(center=(0.3, 0.5))
     place(im, card(who, 250, angle=-4), 300, 380)
     text(im, (560, 80), title.upper(), body(30, 700), fill=GOLD_SOFT)
     text(im, (560, 150), '“', display(200), fill=(120, 44, 44), shadow=False)
-    text(im, (560, 330), 'Фраза\nДона' if title == 'Фраза дня' else title.replace(' ', '\n', 1), display(64), spacing=10)
+    text(im, (560, 330), big, display(64), spacing=10)
     frame(im)
     save(im, f'fraza-{name}')
 
@@ -441,8 +442,16 @@ if __name__ == '__main__':
     save(gathering(0, 'cancelled'), 'gather-cancelled')
     save(gathering(10, 'done'), 'gather-done')
     reminder('60'); reminder('10'); table_open(); stats()
-    for name, who, title in [('don', 'don', 'Фраза дня'), ('mafia', 'mafia', 'Фраза дня'), ('sheriff', 'sheriff', 'Фраза дня'),
-                             ('civilian', 'civilian', 'Фраза дня'), ('host', 'civilian-priest', 'Фраза дня'), ('saying', 'civilian-fisher', 'Фраза дня'),
-                             ('story', 'civilian-accordion', 'Байка из Палермо'), ('tip', 'don', 'Совет семьи'), ('log', 'sheriff', 'Из протокола')]:
-        fraza(name, who, title)
+    for name, who, title, big in [
+        ('don', 'don', 'Фраза дня', 'Говорит\nДон'),
+        ('mafia', 'mafia', 'Фраза дня', 'Говорит\nМафия'),
+        ('sheriff', 'sheriff', 'Фраза дня', 'Говорит\nШериф'),
+        ('civilian', 'civilian', 'Фраза дня', 'Говорит\nмирный'),
+        ('host', 'civilian-priest', 'Фраза дня', 'Говорит\nведущий'),
+        ('saying', 'civilian-fisher', 'Фраза дня', 'Сицилийская\nпоговорка'),
+        ('story', 'civilian-accordion', 'Байка', 'Из жизни\nПалермо'),
+        ('tip', 'don', 'Совет семьи', 'Дон\nсоветует'),
+        ('log', 'sheriff', 'Из протокола', 'Записано\nв протокол'),
+    ]:
+        fraza(name, who, title, big)
     print('готово:', len(os.listdir(OUT)), 'картинок')

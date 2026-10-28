@@ -71,8 +71,8 @@ function jokeImage(j: Joke): string {
 }
 
 function jokeCaption(j: Joke): string {
-  // Заголовок («Фраза дня», «Байка из Палермо») уже на картинке
-  return j.kind === 'quote' ? `<i>«${h(j.text)}»</i>\n\n<b>${h(j.by ?? '')}</b>` : h(j.text);
+  // Кто говорит и что это за история, уже написано на картинке
+  return j.kind === 'quote' ? `<i>«${h(j.text)}»</i>` : h(j.text);
 }
 
 // ---------- Тексты Дона ----------
