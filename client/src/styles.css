@@ -29,11 +29,14 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+/* Без системной подсветки нажатия в Android: она прямоугольная и не повторяет скругления кнопок */
+html { -webkit-tap-highlight-color: transparent; }
 body { min-height: 100vh; -webkit-font-smoothing: antialiased; }
 body.is-night { background: var(--night); }
 button, input { font-family: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: default; }
+button:not(:disabled):active { filter: brightness(1.15); }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .boot { text-align: center; color: var(--muted); padding: 40vh 16px 0; }
 
@@ -102,6 +105,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .seg.three { grid-template-columns: 1fr 1fr 1fr; }
 .seg.three button { font-size: 13px; padding: 0 4px; }
 .seg button { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; }
+.seg button { transition: background .15s, border-color .15s, color .15s; }
 .seg button[aria-pressed="true"] { background: var(--seat); border-color: var(--blue); color: var(--text); }
 
 /* ---------- Плашки ---------- */
