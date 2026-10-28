@@ -4,6 +4,7 @@ import type { Action } from '../../engine/index.ts';
 import type { ServerMessage } from '../../server/protocol.ts';
 import { Net } from './net.ts';
 import { save, store } from './store.ts';
+import type { Store } from './store.ts';
 import { clock, isNightLike, remainingMs } from './util.ts';
 import { renderHost } from './views/host.ts';
 import { renderLobby } from './views/lobby.ts';
@@ -47,13 +48,12 @@ function toast(text: string): void {
 function onMessage(msg: ServerMessage): void {
   switch (msg.t) {
     case 'welcome':
+      // Экран не трогаем: сразу следом придёт стол, и окно сменится лобби за один раз
       store.prevSession = null;
-      store.sheet = null;
-      store.screen = 'main';
       store.session = { code: msg.code, token: msg.token };
       save('mafia.session', store.session);
       history.replaceState(null, '', '/');
-      break;
+      return;
     case 'state': {
       store.offset = msg.now - Date.now();
       const seat = msg.game?.mySeat;
@@ -62,6 +62,7 @@ function onMessage(msg: ServerMessage): void {
       // Свою карту только что взяли: когда она перевернётся, обновим плашку с ролью
       if (msg.game?.phase === 'deal' && dealtAt !== null && dealtAt !== prev) setTimeout(render, 1600);
       feel(store.game, msg.game);
+      if (!store.room) { store.sheet = null; store.screen = 'main'; }
       store.room = msg.room;
       store.game = msg.game;
       voice.update(msg.room);
@@ -210,6 +211,7 @@ function selectionKey(): string {
 }
 
 let preloaded = '';
+let shownSheet: Store['sheet'] = null;
 
 function render(): void {
   // Новый шаг игры — сбрасываем выбранные номера
@@ -244,8 +246,21 @@ function render(): void {
   const focusModel = focused?.dataset?.model;
   const caret = focused?.selectionStart ?? null;
 
+  // Окно на главном экране выезжает только при открытии, а не при каждой перерисовке
+  const sheetEnter = store.sheet !== null && store.sheet !== shownSheet;
+  shownSheet = store.sheet;
+  const sheetScroll = root.querySelector('.sheet')?.scrollTop ?? 0;
+
   document.body.classList.toggle('is-night', isNightLike(game) && room?.you.kind !== 'host');
   root.innerHTML = html;
+
+  const sheetEl = root.querySelector('.sheet');
+  if (sheetEl) {
+    if (sheetEnter) {
+      sheetEl.classList.add('enter');
+      root.querySelector('.sheet-backdrop')?.classList.add('enter');
+    } else sheetEl.scrollTop = sheetScroll;
+  }
 
   renderVoiceBar();
 
@@ -288,6 +303,11 @@ setInterval(() => {
 
 // ---------- Нажатия ----------
 
+/** Переключатель из нескольких кнопок: отмечаем нажатую на месте, без перерисовки экрана. */
+function pressOnly(el: HTMLElement): void {
+  el.parentElement?.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
+}
+
 function num(el: HTMLElement): number {
   return Number(el.dataset.n);
 }
@@ -297,9 +317,9 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
     const v = el.dataset.v;
     store.gender = v === 'f' || v === 'x' ? v : 'm';
     save('mafia.gender', store.gender);
-    render();
+    pressOnly(el);
   },
-  joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; render(); },
+  joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; pressOnly(el); },
   create: (el) => {
     if (!store.nick.trim()) return toast('Введите ник');
     net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session, gender: store.gender });

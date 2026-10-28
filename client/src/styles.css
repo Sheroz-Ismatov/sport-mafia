@@ -374,10 +374,11 @@ body.has-voice .offline { bottom: 76px; }
 .link-row > span:last-child { font-size: 20px; color: var(--muted); }
 
 /* Выезжающее окно */
-.sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .62); z-index: 40; animation: fade-in .2s ease both; }
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .62); z-index: 40; }
+.sheet-backdrop.enter { animation: fade-in .2s ease both; }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-width: 520px; margin: 0 auto; max-height: 92vh; overflow-y: auto;
   padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: var(--panel); border: 1px solid var(--line); border-bottom: none;
-  display: flex; flex-direction: column; gap: 14px; animation: sheet-up .25s cubic-bezier(.2,.8,.2,1) both; box-shadow: 0 -12px 40px rgba(0, 0, 0, .5); }
+  display: flex; flex-direction: column; gap: 14px; box-shadow: 0 -12px 40px rgba(0, 0, 0, .5); }
 .sheet h2 { margin: 0 40px 0 0; font-family: var(--display); font-size: 20px; }
 .sheet-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--seat); color: var(--muted); font-size: 15px; }
 .choice { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 12px; border-radius: 16px; background: var(--seat); border: 1px solid var(--line); color: var(--text); font: inherit; }
@@ -385,6 +386,8 @@ body.has-voice .offline { bottom: 76px; }
 .choice img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; object-position: center 15%; flex: none; }
 .choice b { display: block; font-size: 16px; margin-bottom: 3px; }
 .choice small { display: block; font-size: 13px; line-height: 1.4; color: var(--muted); }
+
+.sheet.enter { animation: sheet-up .25s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sheet, .sheet-backdrop { animation: none; } }
