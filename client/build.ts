@@ -11,6 +11,8 @@ await copyFile(new URL('./src/index.html', import.meta.url), new URL('index.html
 await copyFile(new URL('./src/styles.css', import.meta.url), new URL('styles.css', dist));
 // Рисунки карт
 await cp(new URL('./src/img/', import.meta.url), new URL('img/', dist), { recursive: true });
+// Шрифты Rubik и Unbounded (кириллица и латиница, woff2), лицензия OFL рядом
+await cp(new URL('./src/fonts/', import.meta.url), new URL('fonts/', dist), { recursive: true });
 
 const options = {
   entryPoints: [fileURLToPath(new URL('./src/main.ts', import.meta.url))],

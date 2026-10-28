@@ -197,6 +197,19 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
       }
       return;
     }
+    // Свои шрифты (только простые имена файлов): не меняются, кэшируем надолго
+    const font = /^\/fonts\/([\w-]+\.woff2)$/.exec(path);
+    if (font) {
+      try {
+        const body = await readFile(dist(`fonts/${font[1]}`));
+        res.writeHead(200, { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=31536000, immutable' });
+        res.end(body);
+      } catch {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('Не найдено\n');
+      }
+      return;
+    }
     // Голос: собранные куски LiveKit и Krisp из client/dist/lk/ (только простые имена файлов)
     const lk = /^\/lk\/([\w.-]+\.js)$/.exec(path);
     if (lk) {
