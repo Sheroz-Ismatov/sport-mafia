@@ -68,7 +68,7 @@ test('аккаунты: вход, место по аккаунту, партия
   const base = `http://localhost:${(srv.server.address() as AddressInfo).port}`;
   try {
     const cfg = await (await fetch(`${base}/api/config`)).json();
-    assert.deepEqual(cfg, { telegram: { bot: 'mafia_test_bot', app: 'play' }, accounts: true });
+    assert.deepEqual(cfg, { telegram: { bot: 'mafia_test_bot', app: 'play', inline: false }, accounts: true });
 
     // Подделанные данные не пускают
     const bad = await fetch(`${base}/api/auth`, { method: 'POST', body: JSON.stringify({ initData: initData(1, 'Лео').replace('hash=', 'hash=00') }) });

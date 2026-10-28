@@ -2,6 +2,7 @@
 // Адрес базы в переменной DATABASE_URL. Без неё игра работает, но статистика не сохраняется.
 
 import type { TgUser } from './auth.ts';
+import { PgBotStore } from './bot/store.ts';
 
 export interface User {
   id: number;
@@ -144,6 +145,16 @@ export class PgDb implements Db {
       [u.tgId, u.firstName, u.lastName, u.username, u.photoUrl],
     );
     return rowToUser(rows[0]);
+  }
+
+  async userByTg(tgId: number): Promise<User | null> {
+    const { rows } = await this.pool.query('select * from users where tg_id = $1', [tgId]);
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
+  /** Хранилище бота в той же базе. */
+  botStore(): Promise<PgBotStore> {
+    return PgBotStore.create(this.pool);
   }
 
   async getUser(id: number): Promise<User | null> {

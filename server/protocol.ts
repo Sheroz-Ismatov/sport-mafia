@@ -9,7 +9,7 @@ export type Gender = 'm' | 'f' | 'x';
 
 /** Браузер → сервер */
 export type ClientMessage =
-  | { t: 'create'; nick: string; as?: 'host' | 'player'; session?: string; gender?: Gender } // создать комнату: вести игру или играть самому (тогда без ведущего)
+  | { t: 'create'; nick: string; as?: 'host' | 'player'; session?: string; gender?: Gender; gathering?: number } // gathering — стол для сбора из бота // создать комнату: вести игру или играть самому (тогда без ведущего)
   | { t: 'join'; code: string; nick: string; as: 'player' | 'spectator'; session?: string; gender?: Gender } // войти по коду; session — вход через Telegram
   | { t: 'resume'; code: string; token: string }                          // вернуться после обрыва связи
   | { t: 'addBots' }                                                      // создатель: добрать стол ботами (для проверки)
@@ -54,7 +54,7 @@ export interface ApiUser {
 }
 
 export interface ApiConfig {
-  telegram: { bot: string; app: string | null } | null; // бот для входа и ссылок t.me
+  telegram: { bot: string; app: string | null; inline: boolean } | null; // бот для входа и ссылок t.me; inline — карточки приглашения через бота
   accounts: boolean;                                     // вход и статистика работают (есть бот и база)
 }
 

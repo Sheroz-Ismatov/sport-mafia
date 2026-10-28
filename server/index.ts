@@ -14,6 +14,9 @@ import { Voice, voiceConfigFromEnv } from './voice.ts';
 import { readSession, signSession, telegramConfigFromEnv, verifyInitData, verifyLoginWidget } from './auth.ts';
 import type { TelegramConfig } from './auth.ts';
 import { PgDb } from './db.ts';
+import { Bot, webhookSecret } from './bot/bot.ts';
+import { HttpTgApi } from './bot/tgapi.ts';
+import { MemoryBotStore } from './bot/store.ts';
 import type { Db, User } from './db.ts';
 import type { ApiConfig, ApiUser } from './protocol.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -32,6 +35,8 @@ export interface ServerOptions extends RoomOptions {
   gamesFile?: string | null; // куда дописывать итоги партий (null — не писать)
   telegram?: TelegramConfig | null; // вход через Telegram
   db?: Db | null;                   // база игроков и партий
+  bot?: Bot | null;                 // бот Дона: webhook, сборы, напоминания
+  botTickMs?: number;               // как часто бот проверяет напоминания (по умолчанию 30 с)
 }
 
 const apiUser = (u: User): ApiUser => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, username: u.username, photoUrl: u.photoUrl });
@@ -70,6 +75,14 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
 
   const telegram = opts.telegram ?? null;
   const db = opts.db ?? null;
+  const bot = opts.bot ?? null;
+  // Бот показывает в карточке приглашения, сколько людей за столом
+  if (bot && !bot.opts.roomInfo) {
+    bot.opts.roomInfo = (code) => {
+      const r = rooms.get(code);
+      return r && !r.closed ? { players: r.players().length, host: r.host()?.nick ?? null, started: !!r.game } : null;
+    };
+  }
   const userOf = (session: unknown): number | null => (telegram && db ? readSession(session, telegram.botToken) : null);
 
   const saveGame = async (room: Room) => {
@@ -115,7 +128,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
   const api = async (req: IncomingMessage, res: ServerResponse, path: string) => {
     if (path === '/api/config' && req.method === 'GET') {
       const body: ApiConfig = {
-        telegram: telegram ? { bot: telegram.botUsername, app: telegram.appName } : null,
+        telegram: telegram ? { bot: telegram.botUsername, app: telegram.appName, inline: !!opts.bot?.inline } : null,
         accounts: !!(telegram && db),
       };
       return sendJson(res, 200, body);
@@ -175,6 +188,27 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
       res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
       return;
     }
+    // Сообщения от Telegram для бота: адрес и заголовок с секретом знает только Telegram
+    if (bot && telegram && req.method === 'POST' && path === `/tg/${webhookSecret(telegram.botToken)}`) {
+      if (req.headers['x-telegram-bot-api-secret-token'] !== webhookSecret(telegram.botToken)) {
+        res.writeHead(401);
+        res.end();
+        return;
+      }
+      let update: unknown;
+      try {
+        update = await readJson(req, 1024 * 1024);
+      } catch {
+        res.writeHead(400);
+        res.end();
+        return;
+      }
+      // Отвечаем сразу, а обрабатываем потом: иначе Telegram будет повторять сообщение
+      res.writeHead(200);
+      res.end();
+      void bot.handleUpdate(update);
+      return;
+    }
     if (path.startsWith('/api/')) {
       try {
         await api(req, res, path);
@@ -185,11 +219,12 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     }
     // Страница игры: только файлы из списка, никаких путей с диска от пользователя
     // Рисунки карт (только простые имена файлов)
-    const img = /^\/img\/([\w-]+\.(webp|png))$/.exec(path);
+    const img = /^\/img\/([\w-]+\.(webp|png|jpg))$/.exec(path);
     if (img) {
       try {
         const body = await readFile(dist(`img/${img[1]}`));
-        res.writeHead(200, { 'content-type': img[2] === 'png' ? 'image/png' : 'image/webp', 'cache-control': 'public, max-age=86400' });
+        const type = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' }[img[2]];
+        res.writeHead(200, { 'content-type': type, 'cache-control': 'public, max-age=86400' });
         res.end(body);
       } catch {
         res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
@@ -293,6 +328,13 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userId, cleanGender(msg.gender));
             member.photoUrl = photo;
             room.ownerToken = member.token;
+            // Стол для сбора из бота: бот позовёт всех, кто записался
+            const gid = Number(msg.gathering);
+            if (bot && db && userId !== null && Number.isInteger(gid) && gid > 0) {
+              const code = room.code;
+              void db.getUser(userId).then((u) => (u ? bot.roomOpened(gid, code, u.tgId) : false))
+                .catch((e) => console.error('Бот: не удалось позвать на стол сбора', e));
+            }
           } else {
             const found = rooms.get(String(msg.code ?? '').trim().toUpperCase());
             if (!found) {
@@ -357,6 +399,9 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     }
   }, Math.min(5_000, roomIdleMs));
 
+  // Бот: напоминания о сборах и фраза дня
+  const botTimer = bot ? setInterval(() => { bot.tick().catch((e) => console.error('Бот: ошибка таймера', e)); }, opts.botTickMs ?? 30_000) : null;
+
   return new Promise((resolve) => {
     server.listen(opts.port ?? 8080, () => {
       resolve({
@@ -364,6 +409,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
         rooms,
         close: async () => {
           clearInterval(sweep);
+          if (botTimer) clearInterval(botTimer);
           clearInterval(heartbeat);
           for (const room of rooms.values()) room.close('Сервер остановлен');
           for (const client of wss.clients) client.terminate();
@@ -396,8 +442,34 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
       console.error('Не удалось подключиться к базе, статистика не сохраняется', e);
     }
   }
+  // Бот Дона: хранилище в той же базе (без базы в памяти), webhook на публичный адрес сайта
+  const publicUrl = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '') || null;
+  let bot: Bot | null = null;
+  if (telegram) {
+    const pg = db instanceof PgDb ? db : null;
+    bot = new Bot({
+      api: new HttpTgApi(telegram.botToken),
+      store: pg ? await pg.botStore() : new MemoryBotStore(),
+      botUsername: telegram.botUsername,
+      appName: telegram.appName,
+      publicUrl,
+      defaultTz: process.env.BOT_TZ || 'Asia/Dushanbe',
+      stats: pg ? async (tgId) => { const u = await pg.userByTg(tgId); return u ? pg.stats(u.id) : null; } : undefined,
+    });
+    if (publicUrl) {
+      const secret = webhookSecret(telegram.botToken);
+      bot.setup(`${publicUrl}/tg/${secret}`, secret)
+        .then(() => console.log(`Бот: webhook настроен, inline ${bot!.inline ? 'включён' : 'выключен (BotFather → /setinline)'}`))
+        .catch((e) => console.error('Бот: не удалось настроить webhook', e));
+      // Бесплатный Render засыпает через 15 минут без запросов. Пока впереди сбор или кто-то ждёт фразу дня,
+      // стучимся к себе раз в 10 минут, чтобы напоминания ушли вовремя.
+      setInterval(() => {
+        bot!.needsAwake().then((need) => (need ? fetch(`${publicUrl}/health`).then(() => {}) : undefined)).catch(() => {});
+      }, 10 * 60_000);
+    } else console.log('Бот: нет PUBLIC_URL, webhook не настроен (на Render адрес берётся сам)');
+  }
   console.log(telegram ? `Telegram: @${telegram.botUsername}${telegram.appName ? `/${telegram.appName}` : ''}` : 'Вход через Telegram выключен: не заданы TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_USERNAME');
-  startServer({ port, settings, voice: voiceCfg ? new Voice(voiceCfg) : null, telegram, db }).then(() => {
+  startServer({ port, settings, voice: voiceCfg ? new Voice(voiceCfg) : null, telegram, db, bot }).then(() => {
     console.log(`Сервер спортивной мафии: http://localhost:${port}${settings ? ` (таймеры ×${scale})` : ''}`);
     console.log(voiceCfg ? `Голос: ${voiceCfg.url}` : 'Голос выключен: не заданы LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET');
   });
