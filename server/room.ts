@@ -35,7 +35,7 @@ const MAX_NICK = 24;
 
 export function cleanNick(raw: unknown): string {
   const nick = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, MAX_NICK) : '';
-  if (!nick) throw new Error('Введите ник');
+  if (!nick) throw new Error('Введи ник');
   return nick;
 }
 
@@ -237,7 +237,7 @@ export class Room {
   private restart(m: Member): string | null {
     if (!this.isOwner(m)) return 'Новую партию начинает создатель комнаты';
     if (!this.game) return 'Игра ещё не начиналась';
-    if (this.game.phase !== 'ended') return 'Сначала доиграйте партию';
+    if (this.game.phase !== 'ended') return 'Сначала доиграйте партию до конца';
     this.stopTimers();
     this.game = null;
     this.endReported = false;
@@ -262,7 +262,7 @@ export class Room {
     if (m.kind === 'host') actor = { kind: 'host' };
     else if (m.kind === 'player') {
       const seat = this.seatOf(m);
-      if (seat === null) return 'Вы не за столом';
+      if (seat === null) return 'Ты не за столом';
       actor = { kind: 'seat', seat };
     } else return 'Наблюдатели не участвуют в игре';
 

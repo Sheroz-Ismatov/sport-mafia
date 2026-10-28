@@ -63,7 +63,7 @@ export function verifyInitData(initData: string, botToken: string, nowSec = Math
   const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
   const expected = createHmac('sha256', secret).update(checkString(fields)).digest('hex');
   if (!sameHex(hash, expected)) throw new Error('Подпись Telegram не сходится');
-  if (!freshEnough(fields.get('auth_date'), nowSec, maxAgeSec)) throw new Error('Данные Telegram устарели, откройте игру заново');
+  if (!freshEnough(fields.get('auth_date'), nowSec, maxAgeSec)) throw new Error('Данные Telegram устарели, открой игру заново');
   const user = toUser(JSON.parse(fields.get('user') ?? '{}'));
   return { user, startParam: fields.get('start_param') ?? null };
 }

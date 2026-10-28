@@ -170,7 +170,7 @@ async function loadProfile(): Promise<void> {
     if ((e as { status?: number }).status === 401) {
       setAccount(null);
       store.screen = 'main';
-      toast('Войдите заново');
+      toast('Войди заново');
       return;
     }
     store.profile = { stats: null, error: (e as Error).message || 'Нет связи с сервером', loading: false };
@@ -353,7 +353,7 @@ function render(): void {
       api.authWidget(user)
         .then((acc) => {
           setAccount({ session: acc.session, user: acc.user });
-          toast(`Вы вошли как ${acc.user.firstName}`);
+          toast(`${store.gender === 'f' ? 'Ты вошла' : 'Ты вошёл'} как ${acc.user.firstName}`);
         })
         .catch((e: Error) => toast(e.message));
     });

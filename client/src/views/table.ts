@@ -69,7 +69,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
     if (o.host && s.role === 'sheriff') cls.push('sheriff');
     if (s.seat === o.mySeat) {
       cls.push('me');
-      sub = 'вы';
+      sub = 'ты';
     }
     if (game.phase === 'ended' && s.role) sub = ROLE_SHORT[s.role];
     if (!s.alive) {

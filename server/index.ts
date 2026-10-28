@@ -140,7 +140,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     if (path === '/api/me' && req.method === 'GET') {
       const userId = readSession((req.headers.authorization ?? '').replace(/^Bearer /, ''), telegram.botToken);
       const user = userId === null ? null : await db.getUser(userId);
-      if (!user) return sendJson(res, 401, { error: 'Войдите заново' });
+      if (!user) return sendJson(res, 401, { error: 'Войди заново' });
       return sendJson(res, 200, { user: apiUser(user), stats: await db.stats(user.id) });
     }
     sendJson(res, 404, { error: 'Не найдено' });
@@ -271,7 +271,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
 
       try {
         if (msg.t === 'create' || msg.t === 'join' || msg.t === 'resume') {
-          if (member) return error('Вы уже в комнате');
+          if (member) return error('Ты уже за столом');
           if (msg.t === 'create') {
             room = new Room(newCode(), { ...opts, onGameEnd: (r) => { saveGame(r).catch((e) => console.error('Не удалось сохранить партию', e)); } });
             rooms.set(room.code, room);
@@ -285,7 +285,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             if (!found) {
               // Комнаты живут в памяти: после перезапуска сервера их нет
               if (msg.t === 'resume') {
-                return send({ t: 'error', code: 'room_gone', message: 'Игра прервалась: сервер перезапускался, и комната закрылась. Создайте новую.' });
+                return send({ t: 'error', code: 'room_gone', message: 'Игра прервалась: сервер перезапускался, и стол закрылся. Создай новый.' });
               }
               return error('Комната не найдена');
             }
@@ -299,7 +299,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             } else {
               member = found.members.get(String(msg.token)) ?? null;
               if (!member || member.bot) {
-                return send({ t: 'error', code: 'room_gone', message: 'Не удалось вернуться в комнату, войдите заново' });
+                return send({ t: 'error', code: 'room_gone', message: 'Не удалось вернуться за стол, войди заново' });
               }
             }
             room = found;
@@ -307,7 +307,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
           return room.connect(member, send);
         }
 
-        if (!room || !member) return error('Сначала войдите в комнату');
+        if (!room || !member) return error('Сначала сядь за стол');
         if (msg.t === 'disband') {
           if (!room.canDisband(member)) return error('Распустить стол может только ведущий или создатель комнаты');
           room.close(member.kind === 'host' ? 'Ведущий распустил стол' : `${member.nick} распустил стол`);

@@ -30,10 +30,10 @@ export function accountCard(store: Store): string {
   }
   if (store.authPending) return '<div class="card account"><p class="hint">Входим через Telegram…</p></div>';
   if (!cfg?.accounts || !cfg.telegram) return '';
-  if (inTelegram) return '<div class="card account"><p class="hint">Не получилось войти через Telegram. Закройте игру и откройте снова.</p></div>';
+  if (inTelegram) return '<div class="card account"><p class="hint">Не получилось войти через Telegram. Закрой игру и открой снова.</p></div>';
   return `<div class="card account">
     <h2>Статистика игр</h2>
-    <p class="hint">Войдите через Telegram, чтобы сохранялись ваши партии и победы по ролям. Можно играть и без входа.</p>
+    <p class="hint">Войди через Telegram, чтобы сохранялись твои партии и победы по ролям. Можно играть и без входа.</p>
     <div id="tg-login" class="tg-login"></div>
   </div>`;
 }

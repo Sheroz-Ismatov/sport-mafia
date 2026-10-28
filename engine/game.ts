@@ -260,7 +260,7 @@ export class Game {
   private pickCard(seat: number, index: number): void {
     if (this.phase !== 'deal') fail('Раздача уже закончилась');
     if (this.dealTurn !== seat) fail('Сейчас тянет карту другой игрок');
-    if (this.seatOf(seat).dealtAt !== null) fail('Вы уже взяли карту');
+    if (this.seatOf(seat).dealtAt !== null) fail('Ты уже взял карту');
     if (!Number.isInteger(index) || index < 0 || index >= this.size || this.deckTakenBy[index] !== null) fail('Эту карту уже взяли');
     this.takeCard(seat, index);
   }
@@ -374,7 +374,7 @@ export class Game {
 
   private pass(seat: number): void {
     if (!['day', 'tieSpeech', 'lastWord'].includes(this.phase) || this.speaker !== seat) {
-      fail('Сейчас не ваша минута');
+      fail('Сейчас не твоя минута');
     }
     this.advance();
   }
@@ -382,7 +382,7 @@ export class Game {
   private nominate(seat: number, target: number): void {
     if (this.phase !== 'day' || this.speaker !== seat) fail('Выставлять можно только в свою минуту');
     this.requireAlive(target);
-    if (this.nominations.some((n) => n.by === seat)) fail('Вы уже выставили кандидатуру сегодня'); // 4.4.3
+    if (this.nominations.some((n) => n.by === seat)) fail('Ты уже выставил кандидатуру сегодня'); // 4.4.3
     if (this.nominations.some((n) => n.target === target)) fail(`№${target} уже выставлен`);
     this.nominations.push({ target, by: seat });
     this.write(`№${seat} выставляет №${target}`);
@@ -421,7 +421,7 @@ export class Game {
     const v = this.voting;
     if (this.phase !== 'voting' || !v) fail('Сейчас нет голосования');
     this.requireAlive(seat);
-    if (seat in v.votes) fail('Вы уже проголосовали'); // 4.4.7
+    if (seat in v.votes) fail('Ты уже проголосовал'); // 4.4.7
     if (v.candidates[v.index] !== target) fail('Сейчас голосуем за другого кандидата');
     v.votes[seat] = target;
   }
@@ -490,7 +490,7 @@ export class Game {
     const l = this.liftVote;
     if (this.phase !== 'liftVote' || !l) fail('Сейчас нет такого голосования');
     this.requireAlive(seat);
-    if (l.yes.includes(seat)) fail('Вы уже проголосовали');
+    if (l.yes.includes(seat)) fail('Ты уже проголосовал');
     l.yes.push(seat);
   }
 
@@ -602,7 +602,7 @@ export class Game {
       this.write(`Шериф проверил №${target}: ${result ? 'чёрный' : 'красный'}`, 'host');
       return;
     }
-    fail('Сейчас не ваша проверка');
+    fail('Сейчас не твоя проверка');
   }
 
   /** Сколько номеров в лучшем ходе: столько, сколько чёрных в игре (3 за полным столом). */
@@ -612,11 +612,11 @@ export class Game {
 
   private makeBestMove(seat: number, seats: number[]): void {
     if (this.phase !== 'night' || this.nightStep !== 'bestMove' || seat !== this.nightKill) {
-      fail('Лучший ход сейчас не ваш');
+      fail('Лучший ход сейчас не твой');
     }
     if (this.bestMove) fail('Лучший ход уже сделан'); // 8.3.3
     const max = this.bestMoveSize();
-    if (!Array.isArray(seats) || seats.length < 1 || seats.length > max) fail(`Назовите до ${max} номеров`);
+    if (!Array.isArray(seats) || seats.length < 1 || seats.length > max) fail(`Назови до ${max} номеров`);
     if (seats.some((n) => !Number.isInteger(n) || n < 1 || n > this.size)) fail(`Только номера 1-${this.size}`);
     if (new Set(seats).size !== seats.length) fail('Номера не повторяются');
     this.bestMove = { by: seat, seats: [...seats] };
@@ -681,7 +681,7 @@ export class Game {
 
   private requireDealt(): void {
     this.requireRunning();
-    if (this.phase === 'deal') fail('Подождите конца раздачи');
+    if (this.phase === 'deal') fail('Подожди конца раздачи');
   }
 
   private foul(n: number, delta: 1 | -1): void {

@@ -138,7 +138,7 @@ export class VoiceClient {
           if (this.room !== room) return;
           this.room = null;
           this.audioBox.replaceChildren();
-          this.set({ status: 'off', micOn: false, talking: new Set(), error: 'Голос отключился. Нажмите, чтобы включить снова' });
+          this.set({ status: 'off', micOn: false, talking: new Set(), error: 'Голос отключился. Нажми, чтобы включить снова' });
         });
       await room.connect(url, token);
       this.send({ t: 'voiceJoined' });

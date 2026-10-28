@@ -2,7 +2,7 @@
 
 import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
-import { ROLE_NAME, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
+import { ROLE_NAME, byGender, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
 import { menuButton } from './exit.ts';
 import { finaleCard } from './finale.ts';
@@ -55,10 +55,10 @@ function header(store: Store, game: GameView): string {
   if (game.me && !flipping) {
     const role = game.me.role;
     badge = `<div class="badge"><div class="mini r-${role}">${game.me.seat}</div>
-      <div class="bt"><small>${game.me.alive ? 'Ваша карта' : 'Вы выбыли'}</small><b class="t-${role}">${ROLE_NAME[role]}</b></div></div>`;
+      <div class="bt"><small>${game.me.alive ? 'Твоя карта' : byGender(store.gender, 'Ты выбыл', 'Ты выбыла')}</small><b class="t-${role}">${ROLE_NAME[role]}</b></div></div>`;
   } else if (game.mySeat) {
     badge = `<div class="badge"><div class="mini r-none">${game.mySeat}</div>
-      <div class="bt"><small>Ваше место</small><b>${flipping ? 'Смотрите карту' : 'Карта не выбрана'}</b></div></div>`;
+      <div class="bt"><small>Твоё место</small><b>${flipping ? 'Смотри карту' : 'Карта не выбрана'}</b></div></div>`;
   } else {
     badge = `<div class="badge"><div class="mini r-none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
       <div class="bt"><small>Наблюдатель</small><b>${room.spectators} в зале</b></div></div>`;
@@ -105,11 +105,11 @@ function dogovorka(store: Store, game: GameView): string {
     ? `<button class="radio" data-act="phrase" data-n="${i}" aria-pressed="${p === m.sheriffPhrase}"><span class="dot"></span>«${esc(p)}»</button>`
     : '').join('');
   const members = m.members.map((x) => `№${x.seat} ${x.role === 'don' ? 'дон' : 'мафия'}`).join(', ');
-  return `<div class="card gold"><div class="row"><span class="k">Ваша команда</span><span class="v">${members}</span></div></div>
+  return `<div class="card gold"><div class="row"><span class="k">Твоя семья</span><span class="v">${members}</span></div></div>
     <div class="stack">
       <div class="row"><h2>План отстрела</h2>${isDon && m.plan.length ? '<button class="link" data-act="planReset">Сбросить</button>' : ''}</div>
       <div class="plan">${plan}</div>
-      <p class="hint">${isDon ? 'Нажимайте номера за столом по порядку ночей' : 'План задаёт дон, вы видите его вживую'}</p>
+      <p class="hint">${isDon ? 'Нажимай номера за столом по порядку ночей' : 'План задаёт дон, ты видишь его вживую'}</p>
     </div>
     <div class="stack"><h2>Маяк: первый номер в речи дона</h2>
       ${isDon ? `<div class="grid4">${beacons}</div>` : `<p class="note">${m.beacon ? '+' + m.beacon : 'Без маяка'}</p>`}</div>
@@ -127,9 +127,9 @@ function dealPanel(store: Store, game: GameView): string {
   if (me) {
     const dealtAt = game.seats[me.seat - 1].dealtAt ?? now;
     parts.push(`<div class="card gold reveal">
-      <h2>Ваша карта</h2>
+      <h2>Твоя карта</h2>
       <div data-act="flipCard" role="button" tabindex="0" aria-label="${store.cardHidden ? 'Показать карту' : 'Скрыть карту'}">${flippingCard(me.role, now - dealtAt, store.cardHidden, seatArt(me.role, me.seat, store.room?.members))}</div>
-      <p class="note">${store.cardHidden ? 'Карта перевёрнута. Нажмите, чтобы посмотреть ещё раз.' : `Вы ${ROLE_NAME[me.role].toLowerCase()}. Роль видите только вы, запомните её.`}</p>
+      <p class="note">${store.cardHidden ? 'Карта перевёрнута. Нажми, чтобы посмотреть ещё раз.' : `Ты ${ROLE_NAME[me.role].toLowerCase()}. Роль видишь только ты, запомни её.`}</p>
     </div>`);
   }
 
@@ -146,11 +146,11 @@ function dealPanel(store: Store, game: GameView): string {
   }).join('');
 
   let hint: string;
-  if (myTurn) hint = '<b>Ваша очередь:</b> возьмите любую карту из колоды';
+  if (myTurn) hint = '<b>Твоя очередь:</b> бери любую карту из колоды';
   else if (me) hint = 'Остальные тянут свои карты';
   else if (game.mySeat && d.turn !== null) {
     const left = game.mySeat - d.turn;
-    hint = `Тянет №${d.turn}. Ваша очередь через ${left} ${left === 1 ? 'игрока' : left < 5 ? 'игрока' : 'игроков'}`;
+    hint = `Тянет №${d.turn}. Твоя очередь через ${left} ${left === 1 ? 'игрока' : left < 5 ? 'игрока' : 'игроков'}`;
   } else hint = `Тянет карту №${d.turn}`;
 
   parts.push(`<div class="card${myTurn ? ' gold' : ''}">
@@ -173,9 +173,9 @@ function dayPanel(store: Store, game: GameView, mode: PickMode | null): string {
   if (me && me.alive && game.speaker === me.seat) {
     const mine = game.nominations.find((x) => x.by === me.seat);
     return `<div class="card accent">
-      <h2>Ваша минута</h2>
-      <p class="note">${game.speakerMuted ? 'У вас 3 фола: эту минуту вы молчите, но можете выставить кандидатуру.' : 'Говорите. Закончите словом «Пас» или кнопкой.'}</p>
-      ${mine ? `<p class="note">Ты выставил №${mine.target}</p>` : ''}
+      <h2>Твоя минута</h2>
+      <p class="note">${game.speakerMuted ? 'У тебя 3 фола: эту минуту молчишь, но можешь выставить кандидатуру.' : 'Говори. Закончи словом «Пас» или кнопкой внизу.'}</p>
+      ${mine ? `<p class="note">${byGender(store.gender, 'Ты выставил', 'Ты выставила')} №${mine.target}</p>` : ''}
     </div>${nomCard}`;
   }
   let wait = '';
@@ -183,10 +183,10 @@ function dayPanel(store: Store, game: GameView, mode: PickMode | null): string {
     const pos = game.speechQueue.indexOf(me.seat);
     const n = pos + 1;
     const word = n % 10 >= 1 && n % 10 <= 4 && (n % 100 < 11 || n % 100 > 14) ? 'игрока' : 'игроков';
-    wait = pos >= 0 ? `Ваша минута через ${n} ${word}` : 'Сегодня вы уже говорили';
+    wait = pos >= 0 ? `Твоя минута через ${n} ${word}` : byGender(store.gender, 'Сегодня ты уже говорил', 'Сегодня ты уже говорила');
   }
   return `<div class="card">
-    <p class="note">Говорит ${speakerName}. ${me?.alive ? 'Ваш микрофон выключен до вашей минуты.' : ''}</p>
+    <p class="note">Говорит ${speakerName}. ${me?.alive ? 'Твой микрофон включится в твою минуту.' : ''}</p>
     ${wait ? `<p class="hint">${wait}</p>` : ''}
   </div>${nomCard}`;
 }
@@ -244,9 +244,10 @@ function nightPanel(store: Store, game: GameView, mode: PickMode | null): string
 
   // Выбор цели, проверка и лучший ход идут через панель действия внизу
   if (mode && me) {
-    return '';  } else {
-    let text = 'Город спит. Ждите утра.';
-    if (me?.team === 'black' && game.myShot !== null) text = `Ваш выстрел в №${game.myShot} принят. Убийство засчитают, только если все живые чёрные выбрали один номер.`;
+    return '';
+  } else {
+    let text = 'Город спит. Жди утра.';
+    if (me?.team === 'black' && game.myShot !== null) text = `Твой выстрел в №${game.myShot} принят. Убийство засчитают, только если все живые чёрные выбрали один номер.`;
     const done = game.myChecks.find((c) => c.night === game.night);
     if (done) text = `Проверка принята.`;
     if (game.bestMove && game.bestMoveBy === me?.seat) text = 'Лучший ход принят.';
@@ -262,7 +263,7 @@ function checksCard(game: GameView): string {
     const res = isDon ? (c.result ? 'шериф' : 'не шериф') : (c.result ? 'чёрный' : 'красный');
     return `<div class="row"><span class="k">Ночь ${c.night}: №${c.target}</span><span class="v ${c.result ? (isDon ? 't-sheriff' : 't-mafia') : ''}">${res}</span></div>`;
   }).join('');
-  return `<div class="card"><h2>Ваши проверки</h2>${rows}</div>`;
+  return `<div class="card"><h2>Твои проверки</h2>${rows}</div>`;
 }
 
 function infoCard(game: GameView): string {
@@ -289,9 +290,9 @@ export function renderPlay(store: Store): string {
   const parts: string[] = [header(store, game)];
 
   if (!game.mySeat) {
-    parts.push('<div class="banner">Вы наблюдатель: слышите игроков и ведущего, роли скрыты до конца партии. Микрофон и чат отключены.</div>');
+    parts.push('<div class="banner">Ты наблюдатель: слышишь игроков и ведущего, роли скрыты до конца партии. Микрофон выключен.</div>');
   } else if (me && !me.alive && game.phase !== 'ended') {
-    parts.push('<div class="banner">Вы выбыли и теперь наблюдаете. Ваша роль скрыта от остальных до конца партии. Микрофон и чат отключены, подсказки игрокам запрещены.</div>');
+    parts.push(`<div class="banner">${byGender(store.gender, 'Ты выбыл', 'Ты выбыла')} и теперь наблюдаешь. Твоя роль скрыта до конца партии. Микрофон выключен, подсказывать игрокам нельзя.</div>`);
   }
 
   const photos = new Map<number, string>();

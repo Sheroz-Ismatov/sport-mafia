@@ -46,11 +46,11 @@ export function renderVoice(room: RoomInfo | null, game: GameView | null, v: Voi
   if (canSpeak) {
     const host = room.you.kind === 'host';
     if (v.selfMuted) state = `<span class="voice-state muted">${MIC_OFF}<span>Микрофон выключен</span></span>`;
-    else if (v.micOn) state = `<span class="voice-state live${v.talking.has(room.you.id) ? ' loud' : ''}">${MIC}<span>${host ? 'Вас слышат все' : 'Ваше слово, вас слышат'}</span></span>`;
+    else if (v.micOn) state = `<span class="voice-state live${v.talking.has(room.you.id) ? ' loud' : ''}">${MIC}<span>${host ? 'Тебя слышат все' : 'Твоё слово, тебя слышат'}</span></span>`;
     else state = `<span class="voice-state">${MIC}<span>Открываю микрофон…</span></span>`;
     button = `<button class="btn tiny" data-act="voiceMute">${v.selfMuted ? 'Включить микрофон' : 'Выключить'}</button>`;
   } else if (listener) {
-    state = `<span class="voice-state">${EAR}<span>Вы слушаете</span></span>`;
+    state = `<span class="voice-state">${EAR}<span>Ты слушаешь</span></span>`;
   } else {
     const why = closedReason(game);
     state = `<span class="voice-state muted">${MIC_OFF}<span>Микрофон закрыт${why ? ` · ${why}` : ''}</span></span>`;

@@ -19,7 +19,7 @@ export function finaleCard(store: Store, game: GameView): string {
   let mine = '';
   if (me?.role) {
     const won = w !== 'draw' && (isBlackRole(me.role) ? w === 'black' : w === 'red');
-    mine = `<p class="finale-mine ${w === 'draw' ? '' : won ? 'win' : 'lose'}">Ваша роль: <b class="t-${me.role}">${ROLE_NAME[me.role]}</b>. ${w === 'draw' ? 'Ничья.' : won ? 'Победа!' : 'В этот раз не повезло.'}</p>`;
+    mine = `<p class="finale-mine ${w === 'draw' ? '' : won ? 'win' : 'lose'}">Твоя роль: <b class="t-${me.role}">${ROLE_NAME[me.role]}</b>. ${w === 'draw' ? 'Ничья.' : won ? 'Победа!' : 'В этот раз не повезло.'}</p>`;
   }
   const cards = game.seats.map((s) => {
     const role = s.role;

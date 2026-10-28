@@ -159,7 +159,7 @@ test('выставление: только в свою минуту, одна к
   start();
   fails(P(2), { type: 'nominate', target: 4 }, /свою минуту/);
   act(P(1), { type: 'nominate', target: 4 });
-  fails(P(1), { type: 'nominate', target: 5 }, /уже выставили/);
+  fails(P(1), { type: 'nominate', target: 5 }, /уже выставил/);
   act(P(1), { type: 'pass' });
   fails(P(2), { type: 'nominate', target: 4 }, /уже выставлен/);
   act(P(2), { type: 'nominate', target: 2 }); // себя можно
