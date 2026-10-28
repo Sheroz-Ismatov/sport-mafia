@@ -70,7 +70,7 @@ export function phaseTitle(game: GameView): string {
 }
 
 export const NIGHT_STEP: Record<string, string> = {
-  shoot: 'Мафия выходит на охоту',
+  shoot: 'Мафия стреляет',
   don: 'Дон ищет шерифа',
   sheriff: 'Шериф проверяет',
   bestMove: 'Лучший ход',

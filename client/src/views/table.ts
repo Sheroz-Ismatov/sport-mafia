@@ -11,6 +11,7 @@ export interface TableOptions {
   photos?: Map<number, string>; // фото из Telegram по номеру места
   host?: boolean;               // стол ведущего: все роли открыты, на местах ники и метки
   offline?: Set<number>;        // места, чьи игроки сейчас не в сети
+  target?: number | null;       // цель мафии по плану на эту ночь (видят только чёрные)
 }
 
 const serverNow = (offset: number) => Date.now() + offset;
@@ -46,7 +47,7 @@ function centerHtml(game: GameView, offset: number): string {
     case 'liftVote':
       return `<span class="lbl">Подъём всех</span>${timer}<span class="sub">${game.lift?.candidates.map((n) => '№' + n).join(', ')}</span>${sub}`;
     case 'night':
-      return `<span class="lbl">Ночь ${game.night}</span>${timer}<span class="sub">${esc(NIGHT_STEP[game.nightStep ?? ''] ?? '')}</span>${sub}`;
+      return `<span class="lbl">Ночь ${game.night}</span><span class="step">${esc(NIGHT_STEP[game.nightStep ?? ''] ?? '')}</span>${timer}${sub}`;
     case 'ended':
       return `<span class="lbl">Конец</span><span class="who">${winnerText(game)}</span>`;
     default:
@@ -80,6 +81,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
     const pickable = o.canPick?.(s.seat) ?? false;
     if (pickable) cls.push('pickable');
     if (o.selected.includes(s.seat)) cls.push('selected');
+    if (o.target === s.seat && s.alive) cls.push('target');
     if (game.phase === 'deal' && game.deal?.turn === s.seat) cls.push('turn');
     const fouls = s.fouls ? '●'.repeat(s.fouls) : '';
     const photo = o.photos?.get(s.seat);

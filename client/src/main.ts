@@ -238,6 +238,22 @@ function sheetKey(): string | null {
 }
 let shownBar = '';
 let shownScreen = '';
+let wasNight: boolean | null = null;
+
+/** Заставка на полторы секунды при смене дня и ночи. При «меньше движения» только плавно меняется фон. */
+function dusk(night: boolean): void {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelector('.dusk')?.remove();
+  const el = document.createElement('div');
+  el.className = `dusk ${night ? 'to-night' : 'to-day'}`;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `${CAT}<b>${night ? 'Город засыпает' : 'Город просыпается'}</b>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+// Силуэт кота для заставки ночи
+const CAT = '<svg viewBox="0 0 64 64" width="84" height="84" fill="currentColor" aria-hidden="true"><path d="M14 8l9 11a18 18 0 0 1 18 0l9-11 2 20a20 20 0 0 1-3 13c5 4 8 10 8 17v2H11v-2c0-7 3-13 8-17a20 20 0 0 1-3-13z"/></svg>';
 
 /** Высоты нижних плашек (голос и панель действия) в CSS: панель встаёт над голосом, контент не прячется под ними. */
 function layoutBars(): void {
@@ -288,7 +304,10 @@ function render(): void {
   shownSheet = openSheet;
   const sheetScroll = root.querySelector('.sheet')?.scrollTop ?? 0;
 
-  document.body.classList.toggle('is-night', isNightLike(game) && room?.you.kind !== 'host');
+  const night = isNightLike(game) && room?.you.kind !== 'host';
+  if (game && game.phase !== 'ended' && wasNight !== null && night !== wasNight) dusk(night);
+  wasNight = game ? night : null;
+  document.body.classList.toggle('is-night', night);
   root.innerHTML = html;
   // Сменился экран (главный, лобби, партия, финал): начинаем сверху, а не с прокрутки прошлого экрана
   const screenId = store.screen === 'rules' ? 'rules' : !room ? `home-${store.screen}` : !game ? 'lobby' : game.phase === 'ended' ? 'final' : 'game';

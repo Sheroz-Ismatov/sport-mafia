@@ -225,14 +225,9 @@ function nightPanel(store: Store, game: GameView, mode: PickMode | null): string
   const step = game.nightStep;
   const blocks: string[] = [];
 
+  // Выбор цели, проверка и лучший ход идут через панель действия внизу
   if (mode && me) {
-    let title = '';
-    if (mode.kind === 'shoot') title = 'Мафия выходит на охоту';
-    if (mode.kind === 'check') title = me.role === 'don' ? 'Найдите шерифа' : 'Проверьте игрока';
-    if (mode.kind === 'bestMove') title = 'Вас убили. Лучший ход';
-    const how = mode.kind === 'bestMove' ? 'Нажми номера тех, кого считаешь чёрными, и отправь внизу.' : 'Нажми номер за столом, потом подтверди кнопкой внизу.';
-    blocks.push(`<div class="card ${mode.kind === 'shoot' ? 'danger' : 'accent'}"><h2>${title}</h2><p class="note">${how}</p></div>`);
-  } else {
+    return '';  } else {
     let text = 'Город спит. Ждите утра.';
     if (me?.team === 'black' && game.myShot !== null) text = `Ваш выстрел в №${game.myShot} принят. Убийство засчитают, только если все живые чёрные выбрали один номер.`;
     const done = game.myChecks.find((c) => c.night === game.night);
@@ -284,7 +279,8 @@ export function renderPlay(store: Store): string {
 
   const photos = new Map<number, string>();
   for (const m of store.room?.members ?? []) if (m.seat && m.photo) photos.set(m.seat, m.photo);
-  parts.push(renderTable(game, { mySeat: me?.seat ?? null, selected: store.selected, canPick: mode ? mode.allow : null, offset: store.offset, photos }));
+  const target = game.phase === 'night' && me?.alive ? game.mafia?.planTargetTonight ?? null : null;
+  parts.push(renderTable(game, { mySeat: me?.seat ?? null, selected: store.selected, canPick: mode ? mode.allow : null, offset: store.offset, photos, target }));
 
   switch (game.phase) {
     case 'deal':
