@@ -8,6 +8,7 @@ import { exitButtons } from './exit.ts';
 import { finaleCard } from './finale.ts';
 import { cardBack, flippingCard } from './cards.ts';
 import { seatArt } from '../art.ts';
+import { actionBar } from './action.ts';
 
 export type PickKind = 'plan' | 'nominate' | 'shoot' | 'check' | 'bestMove';
 
@@ -64,30 +65,6 @@ function header(store: Store, game: GameView): string {
   }
   return `<div class="top"><div class="top-left"><span class="eyebrow">Комната ${esc(room.code)}</span>
     <h1>${phaseTitle(game)}</h1></div>${badge}</div>`;
-}
-
-function selectionButton(store: Store, mode: PickMode): string {
-  const sel = store.selected;
-  const list = sel.map((n) => '№' + n).join(', ');
-  switch (mode.kind) {
-    case 'nominate':
-      return sel.length
-        ? `<button class="btn red" data-act="confirm">Выставить ${list}</button>`
-        : '<p class="hint">Чтобы выставить игрока, нажмите его номер за столом</p>';
-    case 'shoot':
-      return sel.length
-        ? `<button class="btn red" data-act="confirm">Выстрелить в ${list}</button>`
-        : '<p class="hint">Выберите номер за столом</p>';
-    case 'check':
-      return sel.length
-        ? `<button class="btn primary" data-act="confirm">Проверить ${list}</button>`
-        : '<p class="hint">Выберите, кого проверить</p>';
-    case 'bestMove':
-      return `<p class="hint">Выберите, кого считаете чёрными: ${sel.length} из ${mode.max}</p>
-        <button class="btn gold" data-act="confirm" ${sel.length ? '' : 'disabled'}>Отправить лучший ход${sel.length ? ': ' + sel.join(', ') : ''}</button>`;
-    default:
-      return '';
-  }
 }
 
 function mafiaMemo(game: GameView, compact: boolean): string {
@@ -192,8 +169,7 @@ function dayPanel(store: Store, game: GameView, mode: PickMode | null): string {
     return `<div class="card accent">
       <h2>Ваша минута</h2>
       <p class="note">${game.speakerMuted ? 'У вас 3 фола: эту минуту вы молчите, но можете выставить кандидатуру.' : 'Говорите. Закончите словом «Пас» или кнопкой.'}</p>
-      ${mine ? `<p class="note">Вы выставили №${mine.target}</p>` : mode ? selectionButton(store, mode) : ''}
-      <button class="btn primary" data-act="pass">Пас</button>
+      ${mine ? `<p class="note">Ты выставил №${mine.target}</p>` : ''}
     </div>${nomCard}`;
   }
   let wait = '';
@@ -224,7 +200,6 @@ function votingPanel(game: GameView): string {
     let btn = '';
     if (me?.alive) {
       if (myVote === c) btn = '<button class="btn small red" disabled>Ваш голос</button>';
-      else if (myVote === undefined && i === v.index) btn = `<button class="btn small outline-red" data-act="vote" data-n="${c}">Против</button>`;
     }
     return `<div class="${cls.join(' ')}"><div class="num">${c}</div>
       <div class="who"><b>${esc(s.nick)}</b><small>${by ? `выставил №${by.by}` : 'переголосование'}</small></div>
@@ -242,7 +217,7 @@ function liftPanel(game: GameView): string {
   const alive = game.seats.filter((s) => s.alive).length;
   return `<div class="card danger"><h2>Кто за то, чтобы ${l.candidates.map((n) => '№' + n).join(' и ')} покинули стол?</h2>
     <p class="note">Голосов «за»: ${l.yes.length} из ${alive}. Нужно больше половины.</p>
-    ${me?.alive ? `<button class="btn red" data-act="liftYes" ${voted ? 'disabled' : ''}>${voted ? 'Вы проголосовали «за»' : 'За'}</button>` : ''}</div>`;
+    ${voted ? '<p class="note"><b>Твой голос: за</b></p>' : ''}</div>`;
 }
 
 function nightPanel(store: Store, game: GameView, mode: PickMode | null): string {
@@ -255,7 +230,8 @@ function nightPanel(store: Store, game: GameView, mode: PickMode | null): string
     if (mode.kind === 'shoot') title = 'Мафия выходит на охоту';
     if (mode.kind === 'check') title = me.role === 'don' ? 'Найдите шерифа' : 'Проверьте игрока';
     if (mode.kind === 'bestMove') title = 'Вас убили. Лучший ход';
-    blocks.push(`<div class="card ${mode.kind === 'shoot' ? 'danger' : 'accent'}"><h2>${title}</h2>${selectionButton(store, mode)}</div>`);
+    const how = mode.kind === 'bestMove' ? 'Нажми номера тех, кого считаешь чёрными, и отправь внизу.' : 'Нажми номер за столом, потом подтверди кнопкой внизу.';
+    blocks.push(`<div class="card ${mode.kind === 'shoot' ? 'danger' : 'accent'}"><h2>${title}</h2><p class="note">${how}</p></div>`);
   } else {
     let text = 'Город спит. Ждите утра.';
     if (me?.team === 'black' && game.myShot !== null) text = `Ваш выстрел в №${game.myShot} принят. Убийство засчитают, только если все живые чёрные выбрали один номер.`;
@@ -325,7 +301,7 @@ export function renderPlay(store: Store): string {
       const mine = me?.seat === game.speaker;
       const what = game.phase === 'tieSpeech' ? 'оправдание, 30 секунд' : 'последняя минута';
       parts.push(mine
-        ? `<div class="card accent"><h2>Ваше слово: ${what}</h2><button class="btn primary" data-act="pass">Закончить</button></div>`
+        ? `<div class="card accent"><h2>Твоё слово: ${what}</h2><p class="note">Микрофон включён. Закончишь раньше, нажми кнопку внизу.</p></div>`
         : `<div class="card"><p class="note">Говорит №${game.speaker} ${esc(game.seats[(game.speaker ?? 1) - 1].nick)}: ${what}.</p></div>`);
       break;
     }
@@ -351,5 +327,6 @@ export function renderPlay(store: Store): string {
   }
   parts.push(logCard(game, store.showLog || game.phase === 'ended'));
   parts.push(exitButtons(store));
-  return `<div class="screen">${parts.join('')}</div>`;
+  const bar = actionBar(store, game, mode);
+  return `<div class="screen${bar ? ' with-bar' : ''}">${parts.join('')}</div>${bar}`;
 }

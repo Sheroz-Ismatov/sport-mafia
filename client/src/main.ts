@@ -200,6 +200,7 @@ function renderVoiceBar(): void {
   const html = renderVoice(store.room, store.game, voice.state, voice.canSpeak);
   if (voiceRoot.innerHTML !== html) voiceRoot.innerHTML = html;
   document.body.classList.toggle('has-voice', html !== '');
+  layoutBars();
   markTalking(root, store.room, voice.state.talking);
 }
 
@@ -215,7 +216,18 @@ function selectionKey(): string {
 }
 
 let preloaded = '';
+window.addEventListener('resize', () => layoutBars());
 let shownSheet: Store['sheet'] = null;
+let shownBar = '';
+
+/** Высоты нижних плашек (голос и панель действия) в CSS: панель встаёт над голосом, контент не прячется под ними. */
+function layoutBars(): void {
+  const v = voiceRoot.firstElementChild as HTMLElement | null;
+  const bar = root.querySelector<HTMLElement>('.action-bar');
+  const style = document.body.style;
+  style.setProperty('--voice-off', v ? `${v.offsetHeight + 8}px` : '0px');
+  style.setProperty('--bar-h', bar ? `${bar.offsetHeight}px` : '0px');
+}
 
 function render(): void {
   // Новый шаг игры — сбрасываем выбранные номера
@@ -267,6 +279,13 @@ function render(): void {
   }
 
   renderVoiceBar();
+
+  // Панель действия выезжает, только когда появился новый шаг, а не при каждой перерисовке
+  const barEl = root.querySelector<HTMLElement>('.action-bar');
+  const barKey = barEl?.querySelector('.ab-head b')?.textContent ?? '';
+  if (barEl && barKey !== shownBar) barEl.classList.add('enter');
+  shownBar = barKey;
+  layoutBars();
 
   // Системная кнопка «Назад» в Telegram: закрыть окно, выйти из профиля или правил
   if (!room && store.sheet) setBackButton(() => handlers.sheetClose(root));
