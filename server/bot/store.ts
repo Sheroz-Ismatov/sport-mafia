@@ -49,6 +49,7 @@ export interface BotStore {
   getGathering(id: number): Promise<Gathering | null>;
   saveGathering(g: Gathering): Promise<void>;
   openGatherings(): Promise<Gathering[]>;
+  userGatherings(tgId: number): Promise<Gathering[]>; // открытые сборы, где человек организатор или отметился (кроме «не смогу»)
   members(id: number): Promise<GatheringMember[]>;
   setMember(id: number, m: GatheringMember): Promise<void>;
   posts(id: number): Promise<string[]>;     // где висит карточка: «чат:сообщение» или «i:inline_message_id»
@@ -76,6 +77,11 @@ export class MemoryBotStore implements BotStore {
   async getGathering(id: number) { const g = this.gatherings.get(id); return g ? { ...g } : null; }
   async saveGathering(g: Gathering) { this.gatherings.set(g.id, { ...g }); }
   async openGatherings() { return [...this.gatherings.values()].filter((g) => g.status === 'open').map((g) => ({ ...g })); }
+  async userGatherings(tgId: number) {
+    return (await this.openGatherings())
+      .filter((g) => g.creatorTgId === tgId || (this.mem.get(g.id) ?? []).some((m) => m.tgId === tgId && m.status !== 'no'))
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  }
   async members(id: number) { return (this.mem.get(id) ?? []).map((m) => ({ ...m })); }
   async setMember(id: number, m: GatheringMember) {
     const list = this.mem.get(id) ?? [];
@@ -205,6 +211,13 @@ export class PgBotStore implements BotStore {
   }
   async openGatherings() {
     const { rows } = await this.pool.query(`select * from gatherings where status = 'open' order by starts_at`);
+    return rows.map(toGathering);
+  }
+  async userGatherings(tgId: number) {
+    const { rows } = await this.pool.query(
+      `select * from gatherings g where g.status = 'open' and (g.creator_tg_id = $1 or exists (
+         select 1 from gathering_members m where m.gathering_id = g.id and m.tg_id = $1 and m.status <> 'no'))
+       order by g.starts_at`, [tgId]);
     return rows.map(toGathering);
   }
   async members(id: number) {

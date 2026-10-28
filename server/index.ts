@@ -219,7 +219,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
     }
     // Страница игры: только файлы из списка, никаких путей с диска от пользователя
     // Рисунки карт (только простые имена файлов)
-    const img = /^\/img\/([\w-]+\.(webp|png|jpg))$/.exec(path);
+    const img = /^\/img\/((?:bot\/)?[\w-]+\.(webp|png|jpg))$/.exec(path);
     if (img) {
       try {
         const body = await readFile(dist(`img/${img[1]}`));
@@ -461,6 +461,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
       bot.setup(`${publicUrl}/tg/${secret}`, secret)
         .then(() => console.log(`Бот: webhook настроен, inline ${bot!.inline ? 'включён' : 'выключен (BotFather → /setinline)'}`))
         .catch((e) => console.error('Бот: не удалось настроить webhook', e));
+      // Включение inline в BotFather подхватываем без перезапуска
+      setInterval(() => { bot!.checkInline().catch(() => {}); }, 60 * 60_000);
       // Бесплатный Render засыпает через 15 минут без запросов. Пока впереди сбор или кто-то ждёт фразу дня,
       // стучимся к себе раз в 10 минут, чтобы напоминания ушли вовремя.
       setInterval(() => {
