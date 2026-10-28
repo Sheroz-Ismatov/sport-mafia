@@ -7,6 +7,7 @@ import { renderTable } from './table.ts';
 import { exitButtons } from './exit.ts';
 import { finaleCard } from './finale.ts';
 import { cardBack, flippingCard } from './cards.ts';
+import { seatArt } from '../art.ts';
 
 export type PickKind = 'plan' | 'nominate' | 'shoot' | 'check' | 'bestMove';
 
@@ -144,7 +145,7 @@ function dealPanel(store: Store, game: GameView): string {
     const dealtAt = game.seats[me.seat - 1].dealtAt ?? now;
     parts.push(`<div class="card gold reveal">
       <h2>Ваша карта</h2>
-      <div data-act="flipCard" role="button" tabindex="0" aria-label="${store.cardHidden ? 'Показать карту' : 'Скрыть карту'}">${flippingCard(me.role, now - dealtAt, store.cardHidden)}</div>
+      <div data-act="flipCard" role="button" tabindex="0" aria-label="${store.cardHidden ? 'Показать карту' : 'Скрыть карту'}">${flippingCard(me.role, now - dealtAt, store.cardHidden, seatArt(me.role, me.seat, store.room?.members))}</div>
       <p class="note">${store.cardHidden ? 'Карта перевёрнута. Нажмите, чтобы посмотреть ещё раз.' : `Вы ${ROLE_NAME[me.role].toLowerCase()}. Роль видите только вы, запомните её.`}</p>
     </div>`);
   }

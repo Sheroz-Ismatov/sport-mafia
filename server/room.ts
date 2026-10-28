@@ -6,7 +6,7 @@ import { Game, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine/index.ts';
 import type { Action, Actor, Settings, Viewer } from '../engine/index.ts';
 import { botAction } from './bots.ts';
 import type { Voice } from './voice.ts';
-import type { ClientMessage, MemberInfo, MemberKind, RoomInfo, ServerMessage } from './protocol.ts';
+import type { ClientMessage, Gender, MemberInfo, MemberKind, RoomInfo, ServerMessage } from './protocol.ts';
 
 export interface Member {
   id: string;
@@ -16,6 +16,8 @@ export interface Member {
   bot: boolean;
   userId: number | null; // аккаунт Telegram (null — гость или бот)
   photoUrl: string | null; // фото из Telegram для места за столом
+  gender: Gender;
+  art: number | null; // номер рисунка карты, выдаётся на старте партии
   send: ((msg: ServerMessage) => void) | null; // null — сейчас не на связи
 }
 
@@ -36,6 +38,14 @@ export function cleanNick(raw: unknown): string {
   if (!nick) throw new Error('Введите ник');
   return nick;
 }
+
+export function cleanGender(raw: unknown): Gender {
+  return raw === 'f' || raw === 'x' ? raw : 'm';
+}
+
+// Боты: пол по имени, чтобы и у них были разные карты
+const BOTS: [string, Gender][] = [['Бот Аня', 'f'], ['Бот Борис', 'm'], ['Бот Вика', 'f'], ['Бот Гоша', 'm'], ['Бот Даша', 'f'],
+  ['Бот Егор', 'm'], ['Бот Женя', 'x'], ['Бот Зоя', 'f'], ['Бот Илья', 'm'], ['Бот Катя', 'f']];
 
 export class Room {
   readonly code: string;
@@ -66,7 +76,7 @@ export class Room {
 
   // ---------- Участники ----------
 
-  addMember(rawNick: unknown, kind: MemberKind, bot = false, userId: number | null = null): Member {
+  addMember(rawNick: unknown, kind: MemberKind, bot = false, userId: number | null = null, gender: Gender = 'm'): Member {
     let nick = cleanNick(rawNick);
     const taken = new Set([...this.members.values()].map((m) => m.nick.toLowerCase()));
     for (let i = 2; taken.has(nick.toLowerCase()); i++) nick = `${cleanNick(rawNick).slice(0, MAX_NICK - 3)} ${i}`;
@@ -76,7 +86,7 @@ export class Room {
     if (kind === 'spectator' && this.spectators().length >= this.opts.maxSpectators) {
       throw new Error('В комнате нет мест для зрителей');
     }
-    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, userId, photoUrl: null, send: null };
+    const member: Member = { id: randomUUID().slice(0, 8), token: randomUUID(), nick, kind, bot, userId, photoUrl: null, gender, art: null, send: null };
     this.members.set(member.token, member);
     return member;
   }
@@ -191,8 +201,10 @@ export class Room {
   private addBots(m: Member): string | null {
     if (!this.isOwner(m)) return 'Ботов добавляет создатель комнаты';
     if (this.game) return 'Игра уже идёт';
-    const names = ['Бот Аня', 'Бот Борис', 'Бот Вика', 'Бот Гоша', 'Бот Даша', 'Бот Егор', 'Бот Женя', 'Бот Зоя', 'Бот Илья', 'Бот Катя'];
-    for (let i = 0; this.players().length < MAX_PLAYERS; i++) this.addMember(names[i % names.length], 'player', true);
+    for (let i = 0; this.players().length < MAX_PLAYERS; i++) {
+      const [name, gender] = BOTS[i % BOTS.length];
+      this.addMember(name, 'player', true, null, gender);
+    }
     this.broadcast();
     return null;
   }
@@ -209,6 +221,13 @@ export class Room {
     }, this.opts.now());
     if (!r.ok) return r.error;
     this.game = game;
+    // Рисунки карт: перемешанные номера по всем игрокам, чтобы у мирных за столом были разные коты
+    const order = players.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(this.opts.rng() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    players.forEach((p, i) => { p.art = order[i]; });
     this.gameStartedAt = new Date(this.opts.now());
     this.afterChange();
     return null;
@@ -323,6 +342,7 @@ export class Room {
   info(m: Member): RoomInfo {
     const members: MemberInfo[] = [...this.members.values()].map((x) => ({
       id: x.id, nick: x.nick, kind: x.kind, connected: x.bot || x.send !== null, bot: x.bot, seat: this.seatOf(x), photo: x.photoUrl,
+      gender: x.gender, art: this.game ? x.art : null,
     }));
     return {
       code: this.code,

@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
 import { pathToFileURL } from 'node:url';
 import { DEFAULT_SETTINGS, teamOf } from '../engine/index.ts';
-import { Room } from './room.ts';
+import { Room, cleanGender } from './room.ts';
 import type { Member, RoomOptions } from './room.ts';
 import { Voice, voiceConfigFromEnv } from './voice.ts';
 import { readSession, signSession, telegramConfigFromEnv, verifyInitData, verifyLoginWidget } from './auth.ts';
@@ -277,7 +277,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
             rooms.set(room.code, room);
             const userId = userOf(msg.session);
             const photo = await photoOf(userId);
-            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userId);
+            member = room.addMember(msg.nick, msg.as === 'player' ? 'player' : 'host', false, userId, cleanGender(msg.gender));
             member.photoUrl = photo;
             room.ownerToken = member.token;
           } else {
@@ -294,7 +294,7 @@ export function startServer(opts: ServerOptions = {}): Promise<{ server: Server;
               const userId = userOf(msg.session);
               const photo = await photoOf(userId);
               const already = found.memberOfUser(userId);
-              member = already ?? found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player', false, userId);
+              member = already ?? found.addMember(msg.nick, msg.as === 'spectator' ? 'spectator' : 'player', false, userId, cleanGender(msg.gender));
               if (!already) member.photoUrl = photo;
             } else {
               member = found.members.get(String(msg.token)) ?? null;

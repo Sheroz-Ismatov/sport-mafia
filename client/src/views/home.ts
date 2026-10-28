@@ -1,5 +1,6 @@
 // Главный экран: фраза Дона, «Создать стол» и «Войти по коду» (в выезжающих окнах), статистика, правила.
 
+import { GENDERS } from '../art.ts';
 import type { Store } from '../store.ts';
 import type { ApiUser } from '../../../server/protocol.ts';
 import { ROLE_NAME, esc } from '../util.ts';
@@ -67,7 +68,10 @@ function loginCard(store: Store): string {
 
 function nickField(store: Store): string {
   return `<div class="field"><label for="nick">Как тебя называть за столом</label>
-    <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>`;
+    <input id="nick" data-model="nick" maxlength="24" autocomplete="nickname" value="${esc(store.nick)}" placeholder="Например, Лео"></div>
+    <div class="field"><label>Кто ты</label>
+      <div class="seg three" role="group" aria-label="Кто ты">${GENDERS.map((g) =>
+        `<button type="button" data-act="gender" data-v="${g.v}" aria-pressed="${store.gender === g.v}">${g.label}</button>`).join('')}</div></div>`;
 }
 
 function sheet(store: Store): string {

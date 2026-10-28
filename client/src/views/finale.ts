@@ -3,6 +3,7 @@
 import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
 import { ROLE_NAME, ROLE_SHORT, esc, isBlackRole } from '../util.ts';
+import { seatArt } from '../art.ts';
 
 const BANNER = {
   red: { title: 'Город победил', sub: 'Мафию вывели на чистую воду. Можно спать спокойно и не прятать колбасу.', art: 'sheriff' },
@@ -25,7 +26,7 @@ export function finaleCard(store: Store, game: GameView): string {
     const team = role && isBlackRole(role) ? 'black' : 'red';
     const won = w !== 'draw' && team === w;
     return `<div class="fcard c-${role ?? 'civilian'} ${won ? 'won' : ''} ${s.alive ? '' : 'out'} ${s.seat === mySeat ? 'me' : ''}">
-      ${role ? `<img src="/img/${role}.webp" alt="">` : ''}
+      ${role ? `<img src="/img/${seatArt(role, s.seat, store.room?.members)}.webp" alt="">` : ''}
       <span class="fnum">${s.seat}</span>
       <span class="fcap"><b>${esc(s.nick)}</b><small>${role ? ROLE_SHORT[role] : ''}</small></span>
     </div>`;

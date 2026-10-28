@@ -18,18 +18,18 @@ export function roleIcon(role: Role, size = 64): string {
   return `<svg class="role-icon" width="${size}" height="${size}" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">${ICONS[role]}</svg>`;
 }
 
-export function cardFace(role: Role): string {
+export function cardFace(role: Role, art: string = role): string {
   const team = role === 'mafia' || role === 'don' ? 'Чёрные' : 'Красные';
   return `<div class="pcard face art c-${role}">
-    <img src="/img/${role}.webp" alt="" draggable="false">
+    <img src="/img/${art}.webp" alt="" draggable="false">
     <span class="corner">${roleIcon(role, 18)}</span>
     <span class="caption"><b>${ROLE_NAME[role]}</b><small>${team}</small></span>
   </div>`;
 }
 
 /** Заранее загружаем рисунки, чтобы карта перевернулась уже с картинкой. */
-export function preloadCardArt(): void {
-  for (const r of ['back', 'civilian', 'sheriff', 'mafia', 'don']) new Image().src = `/img/${r}.webp`;
+export function preloadCardArt(extra: string[] = []): void {
+  for (const r of ['back', 'sheriff', 'mafia', 'don', ...extra]) new Image().src = `/img/${r}.webp`;
 }
 
 export function cardBack(): string {
@@ -40,13 +40,13 @@ export function cardBack(): string {
  * Карта, которая переворачивается лицом вверх. elapsedMs — сколько прошло с момента,
  * когда её взяли: анимация продолжается с того же места, даже если экран перерисовался.
  */
-export function flippingCard(role: Role, elapsedMs: number, hidden: boolean): string {
+export function flippingCard(role: Role, elapsedMs: number, hidden: boolean, art: string = role): string {
   // Сначала карта выезжает из колоды (0,5 с), потом переворачивается (с 0,5 с)
   const t = Math.max(0, Math.round(elapsedMs));
   return `<div class="flip ${hidden ? 'hidden' : ''}" style="animation-delay:${-t}ms">
     <div class="flip-inner" style="animation-delay:${500 - t}ms">
       <div class="flip-side flip-back">${cardBack()}</div>
-      <div class="flip-side flip-front">${cardFace(role)}</div>
+      <div class="flip-side flip-front">${cardFace(role, art)}</div>
     </div>
   </div>`;
 }

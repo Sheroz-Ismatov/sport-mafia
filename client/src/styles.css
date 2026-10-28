@@ -99,6 +99,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .field input:focus { border-color: var(--blue); outline: none; }
 .code-input { text-transform: uppercase; letter-spacing: .08em; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg.three { grid-template-columns: 1fr 1fr 1fr; }
+.seg.three button { font-size: 13px; padding: 0 4px; }
 .seg button { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; }
 .seg button[aria-pressed="true"] { background: var(--seat); border-color: var(--blue); color: var(--text); }
 

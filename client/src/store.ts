@@ -1,7 +1,7 @@
 // Всё состояние интерфейса в одном месте. Любое изменение → render().
 
 import type { GameView } from '../../engine/index.ts';
-import type { ApiConfig, RoomInfo } from '../../server/protocol.ts';
+import type { ApiConfig, Gender, RoomInfo } from '../../server/protocol.ts';
 import type { Account, Stats } from './tg.ts';
 import { miniAppInitData, parseStartParam } from './tg.ts';
 import { randomQuoteIndex } from './quotes.ts';
@@ -18,6 +18,7 @@ export interface Store {
   toast: string | null;
   // формы на главном экране
   nick: string;
+  gender: Gender; // парень, девушка или трансформер: от этого зависят рисунки карт
   code: string;
   joinAs: 'player' | 'spectator';
   // выбор номеров за столом (выставить, выстрелить, проверить, лучший ход)
@@ -83,6 +84,7 @@ export const store: Store = {
   offset: 0,
   toast: null,
   nick: load<string>('mafia.nick', '') || tgLaunch?.name || '',
+  gender: load<Gender>('mafia.gender', 'm'),
   code: tgLaunch?.invite?.code ?? (params.get('room') ?? '').toUpperCase(),
   joinAs: tgLaunch?.invite ? (tgLaunch.invite.spectator ? 'spectator' : 'player') : params.get('as') === 'spectator' ? 'spectator' : 'player',
   selected: [],

@@ -27,23 +27,25 @@ Node 22.18+ запускает TypeScript напрямую (импорты с `.
 - `engine/` чистый движок без сети: `types.ts`, `game.ts` (раздача, день, голосование и попил, ночь, лучший ход, фолы, удаления, ППК, ничья, `micOpen()`), `view.ts` (`viewFor`: каждый видит только своё).
 - `server/` `index.ts` (HTTP: статика, `/img/*`, `/lk/*`, `/api/config|auth|me`; WebSocket; очередь сообщений на соединение; уборка комнат), `room.ts` (участники, таймеры, боты, `canSpeak`, `close`), `voice.ts` (JWT LiveKit, UpdateParticipant), `auth.ts` (initData Mini App, Login Widget, сессии от токена бота), `db.ts` (Postgres: users, games, game_players, статистика), `bots.ts`, `protocol.ts`.
 - `client/` чистый TS + innerHTML, события через `data-act`. `build.ts` (esbuild → `client/dist`, копирует `src/img`, собирает голос в `dist/lk/` если стоят livekit-client и Krisp). `src/main.ts`, `store.ts`, `net.ts`, `voice.ts`, `tg.ts` (Mini App, вибрация, BackButton, API), `quotes.ts` (30 фраз), `views/`: `home.ts`, `lobby.ts` (круглый стол), `play.ts`, `host.ts` (закреплённая шапка ведущего), `table.ts`, `cards.ts`, `finale.ts`, `profile.ts`, `rules.ts`, `voice.ts`, `exit.ts`.
-- Картинки: `client/src/img/` (don, mafia, sheriff, civilian, back .webp; logo.webp; favicon, иконки).
+- Картинки: `client/src/img/` (don, mafia, sheriff, back .webp; мирные: civilian, civilian-barber, -driver, -fisher, -priest, -accordion, -chef; logo.webp; favicon, иконки). Карты 496×752 webp.
+- Рисунки по полу: `client/src/art.ts` (колоды CATS и KITTIES по ролям, `roleArt`, `seatArt`). Игрок выбирает «Парень / Девушка / Трансформер» рядом с ником (`gender` в create/join, хранится в localStorage). Сервер на старте раздаёт каждому месту случайный номер `art` (перестановка, роль не выдаёт); клиент берёт рисунок из колоды по полу и номеру. Колода кошек пока пустая: девушкам выпадают коты, трансформеру обе колоды. Боты с полом по имени.
 - Протокол WS: `create{nick,as,session}`, `join{code,nick,as,session}`, `resume`, `addBots`, `start`, `restart`, `act`, `leave`, `disband`, `voice`, `voiceJoined`, `ping`. Ответы: `welcome`, `state{now,room,game}`, `voice`, `error{code?:'room_gone'}`, `closed`.
 
 ## Переменные на Render
 `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_APP_NAME=play`, `DATABASE_URL`. Без любой группы игра работает, просто без этой функции.
 
 ## Проверка
-- `npm test` (39 тестов: движок, сервер, голос, вход, аккаунты), `npm run typecheck`.
+- `npm test` (42 теста: движок, сервер, голос, вход, аккаунты), `npm run typecheck`.
 - Тест базы на настоящем Postgres: `TEST_DATABASE_URL=postgres://... npm test`.
 - Быстрые таймеры: `TIMER_SCALE=0.15 node server/index.ts`.
 - В облачной среде Claude npm закрыт: livekit-client, Krisp и pg ставятся только на Render. Для локальных тестов pg собирался из GitHub-исходников; Playwright проверки с поддельными LiveKit/Telegram.
 - Не запускать `pkill -f "node server/index.ts"` в одной команде с запуском: убивает саму оболочку (код 144). Останавливать через `kill $(pgrep -f "^node server/index.ts")`.
 
 ## Состояние (28.10.2026)
-Готово: правила и движок, ведущий и игра без ведущего, голос LiveKit + Krisp, роспуск стола, вход через Telegram и статистика, профиль, карты с котиками, рубашка, логотип, новый главный экран (фразы Дона, окна «Создать стол»/«Войти по коду»), «Как играть», лобби-стол с аватарками, аватарки на местах, вибрация и «Назад» в Telegram, экран конца партии. Всё на Render, у Лео работает.
+Готово: правила и движок, ведущий и игра без ведущего, голос LiveKit + Krisp, роспуск стола, вход через Telegram и статистика, профиль, карты с котиками, рубашка, логотип, новый главный экран (фразы Дона, окна «Создать стол»/«Войти по коду»), «Как играть», лобби-стол с аватарками, аватарки на местах, вибрация и «Назад» в Telegram, экран конца партии, 7 разных мирных котов (парикмахер, таксист, рыбак, падре, аккордеонист, повар и прежний с хлебом), выбор пола. Всё на Render, у Лео работает.
 
 ## Идеи на потом (не утверждены)
+- Котики-девушки: Лео пришлёт рисунки, добавить в KITTIES в `client/src/art.ts` (можно и для шерифа, мафии, дона).
 - Перевести игру с «вы» на «ты» под общий тон (спросил, ответа нет).
 - Сохранять столы в базу, чтобы перезапуск сервера не обрывал партии; платный Render, чтобы не засыпал.
 - Бот отвечает на /start приветствием и кнопкой «Играть», уведомления.

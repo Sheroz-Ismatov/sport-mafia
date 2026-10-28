@@ -18,6 +18,7 @@ import type { GameView } from '../../engine/index.ts';
 import type { Account } from './tg.ts';
 import { renderProfile } from './views/profile.ts';
 import { preloadCardArt } from './views/cards.ts';
+import { seatArt } from './art.ts';
 
 const root = document.getElementById('app')!;
 let explicitResume = false; // человек сам нажал «Вернуться в прежнюю игру»
@@ -139,7 +140,7 @@ function maybeAutoJoin(): void {
   if (!store.autoJoin || store.authPending || !store.online || store.room || store.session) return;
   if (!store.code || !store.nick.trim()) return;
   store.autoJoin = false;
-  net.send({ t: 'join', code: store.code, nick: store.nick, as: store.joinAs, session: store.account?.session });
+  net.send({ t: 'join', code: store.code, nick: store.nick, as: store.joinAs, session: store.account?.session, gender: store.gender });
 }
 
 async function loadProfile(): Promise<void> {
@@ -208,6 +209,8 @@ function selectionKey(): string {
   return g ? [g.phase, g.day, g.night, g.nightStep, g.speaker].join('|') : '';
 }
 
+let preloaded = '';
+
 function render(): void {
   // Новый шаг игры — сбрасываем выбранные номера
   const key = selectionKey();
@@ -216,6 +219,12 @@ function render(): void {
     store.selected = [];
   }
   if (store.game?.phase !== 'deal') store.cardHidden = false;
+  // Перед раздачей заранее грузим своего мирного кота: карта перевернётся уже с картинкой
+  const meNow = store.room?.members.find((m) => m.id === store.room?.you.id);
+  if (meNow?.art != null && meNow.seat) {
+    const art = seatArt('civilian', meNow.seat, store.room?.members);
+    if (art !== preloaded) { preloaded = art; preloadCardArt([art]); }
+  }
 
   const room = store.room;
   const game = store.game;
@@ -284,10 +293,16 @@ function num(el: HTMLElement): number {
 }
 
 const handlers: Record<string, (el: HTMLElement) => void> = {
+  gender: (el) => {
+    const v = el.dataset.v;
+    store.gender = v === 'f' || v === 'x' ? v : 'm';
+    save('mafia.gender', store.gender);
+    render();
+  },
   joinAs: (el) => { store.joinAs = el.dataset.v === 'spectator' ? 'spectator' : 'player'; render(); },
   create: (el) => {
     if (!store.nick.trim()) return toast('Введите ник');
-    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session });
+    net.send({ t: 'create', nick: store.nick, as: el.dataset.v === 'player' ? 'player' : 'host', session: store.account?.session, gender: store.gender });
   },
   restart: () => net.send({ t: 'restart' }),
   card: (el) => act({ type: 'pickCard', index: num(el) }),
@@ -295,7 +310,7 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   join: () => {
     if (!store.nick.trim()) return toast('Введите ник');
     if (!store.code.trim()) return toast('Введите код комнаты');
-    net.send({ t: 'join', code: store.code.trim().toUpperCase(), nick: store.nick, as: store.joinAs, session: store.account?.session });
+    net.send({ t: 'join', code: store.code.trim().toUpperCase(), nick: store.nick, as: store.joinAs, session: store.account?.session, gender: store.gender });
   },
   copyLink: async (el) => {
     const link = el.dataset.v ?? '';

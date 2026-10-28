@@ -4,10 +4,13 @@ import type { Action, GameView } from '../engine/index.ts';
 
 export type MemberKind = 'host' | 'player' | 'spectator';
 
+/** Кем себя видит игрок: от этого зависят рисунки карт. 'x' — «трансформер», карты из обеих колод. */
+export type Gender = 'm' | 'f' | 'x';
+
 /** Браузер → сервер */
 export type ClientMessage =
-  | { t: 'create'; nick: string; as?: 'host' | 'player'; session?: string } // создать комнату: вести игру или играть самому (тогда без ведущего)
-  | { t: 'join'; code: string; nick: string; as: 'player' | 'spectator'; session?: string } // войти по коду; session — вход через Telegram
+  | { t: 'create'; nick: string; as?: 'host' | 'player'; session?: string; gender?: Gender } // создать комнату: вести игру или играть самому (тогда без ведущего)
+  | { t: 'join'; code: string; nick: string; as: 'player' | 'spectator'; session?: string; gender?: Gender } // войти по коду; session — вход через Telegram
   | { t: 'resume'; code: string; token: string }                          // вернуться после обрыва связи
   | { t: 'addBots' }                                                      // создатель: добрать стол ботами (для проверки)
   | { t: 'start' }                                                        // создатель: раздать карты
@@ -27,6 +30,8 @@ export interface MemberInfo {
   bot: boolean;
   seat: number | null;
   photo: string | null; // фото из Telegram (https)
+  gender: Gender;
+  art: number | null;   // номер рисунка карты в партии (случайный у каждого места, роль не выдаёт)
 }
 
 export interface RoomInfo {
