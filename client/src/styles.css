@@ -152,8 +152,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .seat { position: absolute; width: 16.5%; aspect-ratio: .86; transform: translate(-50%, -50%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0; background: var(--seat); border: 1px solid var(--seat-line); color: var(--text); font-family: var(--font); }
 .is-night .seat { background: #1E1315; border-color: var(--line-night); }
 .seat .n { font-family: var(--display); font-size: 18px; font-weight: 700; line-height: 1; }
-.seat .s { font-size: 11px; font-weight: 600; color: var(--muted); max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seat .f { font-size: 9px; letter-spacing: 1px; color: var(--amber); height: 10px; }
+.seat .s { font-size: 10.5px; font-weight: 600; line-height: 1.1; color: var(--muted); max-width: 94%; text-align: center; overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.seat .f { font-size: 9px; letter-spacing: 1px; color: var(--amber); height: 10px; line-height: 10px; }
 .seat.speaking { background: var(--accent-bg); border: 2px solid var(--accent); }
 .seat.speaking .s { color: var(--accent-soft); }
 .seat.speaking { box-shadow: 0 0 12px rgba(217, 178, 92, .35); }
@@ -163,14 +164,18 @@ h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .seat.don .s { color: var(--gold-soft); }
 .seat.me { border-color: var(--red); }
 .seat.me .s { color: var(--red-soft); }
-.seat.nominated::after { content: 'выст.'; position: absolute; top: -8px; right: -6px; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 6px; background: var(--red); color: #1A0607; }
+.seat.nominated { border: 2px solid var(--red); }
+.seat.nominated::after { content: ''; position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); border: 2px solid var(--bg); }
 .seat.out { background: transparent; border: 1px dashed #3A404B; }
 .seat.out .n, .seat.out .s { color: var(--dim); }
 .seat.pickable { cursor: pointer; }
 .seat.pickable:hover { border-color: var(--amber); }
 .seat.selected { background: var(--red-bg); border: 2px solid var(--red); }
 .seat.selected .s { color: var(--red-soft); }
-.seat:disabled { cursor: default; }
+.seat[aria-disabled="true"] { cursor: default; }
+.seat { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.seat-tip { position: fixed; z-index: 50; max-width: 220px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--gold); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); font-size: 13px; line-height: 1.4; color: var(--soft); pointer-events: none; animation: fade-in .12s ease both; }
+.seat-tip b { display: block; font-size: 15px; color: var(--text); overflow-wrap: anywhere; }
 
 /* ---------- Списки ---------- */
 .cand { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }

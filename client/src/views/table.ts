@@ -96,7 +96,7 @@ export function renderTable(game: GameView, o: TableOptions): string {
     }
     const label = `Место ${s.seat}, ${s.nick}${o.host && s.role ? ', ' + ROLE_SHORT[s.role] : ''}${s.alive ? '' : ', ' + outText(s)}${s.fouls ? `, фолов ${s.fouls}` : ''}`;
     return `<button type="button" class="${cls.join(' ')}" style="left:${pos.left}%;top:${pos.top}%"
-      data-act="seat" data-n="${s.seat}" data-vseat="${s.seat}" ${pickable ? '' : 'disabled'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
+      data-act="seat" data-n="${s.seat}" data-vseat="${s.seat}" ${pickable ? '' : 'aria-disabled="true"'} aria-label="${esc(label)}" aria-pressed="${o.selected.includes(s.seat)}">
       ${photo ? `<span class="nrow"><span class="sav"><img src="${esc(photo)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></span><span class="n">${s.seat}</span></span>` : `<span class="n">${s.seat}</span>`}<span class="s">${sub}</span><span class="f">${fouls}</span>${got}${tag}</button>`;
   }).join('');
   return `<div class="table">${seats}<div class="table-center">${centerHtml(game, o.offset)}</div></div>`;

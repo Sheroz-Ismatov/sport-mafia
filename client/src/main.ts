@@ -5,7 +5,7 @@ import type { ServerMessage } from '../../server/protocol.ts';
 import { Net } from './net.ts';
 import { save, store } from './store.ts';
 import type { Store } from './store.ts';
-import { clock, isNightLike, remainingMs } from './util.ts';
+import { clock, esc, isNightLike, outText, remainingMs } from './util.ts';
 import { renderHost } from './views/host.ts';
 import { renderLobby } from './views/lobby.ts';
 import { renderHome } from './views/home.ts';
@@ -590,9 +590,61 @@ const handlers: Record<string, (el: HTMLElement) => void> = {
   voiceTap: () => { void voice.unlockAudio(); },
 };
 
+// ---------- Долгое нажатие на место: полный ник, фолы, кто выставил ----------
+
+let pressTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressed = false;
+
+function hideTip(): void {
+  document.querySelector('.seat-tip')?.remove();
+}
+
+function showTip(seatEl: HTMLElement): void {
+  const game = store.game;
+  const n = Number(seatEl.dataset.n);
+  const s = game?.seats[n - 1];
+  if (!game || !s) return;
+  const lines: string[] = [];
+  if (!s.alive) lines.push(outText(s));
+  lines.push(s.fouls ? `фолов ${s.fouls} из 4` : 'без фолов');
+  const by = game.nominations.find((x) => x.target === n);
+  if (by && ['day', 'voting', 'tieSpeech'].includes(game.phase)) lines.push(`выставил №${by.by}`);
+  const m = store.room?.members.find((x) => x.seat === n);
+  if (m && !m.connected) lines.push('не в сети');
+  hideTip();
+  const tip = document.createElement('div');
+  tip.className = 'seat-tip';
+  tip.innerHTML = `<b>№${n} ${esc(s.nick)}</b>${lines.join('<br>')}`;
+  document.body.appendChild(tip);
+  const r = seatEl.getBoundingClientRect();
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), innerWidth - tip.offsetWidth - 8);
+  const top = r.top - tip.offsetHeight - 8 > 8 ? r.top - tip.offsetHeight - 8 : r.bottom + 8;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+  haptic('tap');
+}
+
+root.addEventListener('pointerdown', (e) => {
+  const seatEl = (e.target as HTMLElement).closest<HTMLElement>('.seat');
+  longPressed = false;
+  if (!seatEl) return;
+  pressTimer = setTimeout(() => { longPressed = true; showTip(seatEl); }, 450);
+});
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
+  root.addEventListener(ev, () => {
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = null;
+    if (longPressed) setTimeout(hideTip, 1600);
+  });
+}
+root.addEventListener('contextmenu', (e) => { if ((e.target as HTMLElement).closest('.seat')) e.preventDefault(); });
+window.addEventListener('scroll', hideTip, { passive: true });
+
 root.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
   if (!el || (el as HTMLButtonElement).disabled) return;
+  // После долгого нажатия место не выбираем: человек просто смотрел подсказку
+  if (longPressed && el.classList.contains('seat')) { longPressed = false; return; }
   const name = el.dataset.act!;
   // Подтверждение удаления, ППК и роспуска стола сбрасывается любым другим нажатием
   if (name !== 'remove' && name !== 'ppk' && (store.removeArmed !== null || store.ppkArmed !== null)) {
