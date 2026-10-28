@@ -77,7 +77,12 @@ export function setupMiniApp(onReady?: () => void): void {
 /** Лёгкая вибрация в Telegram: твоя минута, тебя выставили, голосование, конец партии. */
 export function haptic(kind: 'turn' | 'alert' | 'tap' | 'win' | 'lose'): void {
   const h = webApp?.HapticFeedback;
-  if (!h) return;
+  if (!h) {
+    // Обычный браузер: вибрация через navigator.vibrate (Android; iPhone её не умеет)
+    const pattern = { turn: [180], alert: [80, 60, 80], tap: [30], win: [60, 40, 120], lose: [200] }[kind];
+    try { navigator.vibrate?.(pattern); } catch { /* нет вибрации */ }
+    return;
+  }
   try {
     if (kind === 'turn') h.impactOccurred('heavy');
     else if (kind === 'tap') h.impactOccurred('light');

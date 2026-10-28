@@ -21,6 +21,7 @@ import { renderProfile } from './views/profile.ts';
 import { preloadCardArt } from './views/cards.ts';
 import { seatArt } from './art.ts';
 import { inGame, menuSheets } from './views/exit.ts';
+import { chime, keepAwake } from './attention.ts';
 
 const root = document.getElementById('app')!;
 let explicitResume = false; // человек сам нажал «Вернуться в прежнюю игру»
@@ -97,14 +98,20 @@ function onMessage(msg: ServerMessage): void {
   render();
 }
 
-/** Вибрация на важных для игрока моментах (только внутри Telegram). */
+/** Вибрация и, если включён, звук: твоя очередь или тебя выставили. */
+function signal(kind: 'turn' | 'alert'): void {
+  haptic(kind);
+  if (store.sound) chime(kind);
+}
+
+/** Вибрация на важных для игрока моментах (в Telegram и на Android). */
 function feel(prev: GameView | null, next: GameView | null): void {
   if (!next) return;
   const me = next.mySeat;
   const speech = (g: GameView | null) => !!g && ['day', 'tieSpeech', 'lastWord'].includes(g.phase) && g.speaker === me && me !== null;
-  if (speech(next) && !(speech(prev) && prev!.phase === next.phase)) return haptic('turn');
-  if (next.phase === 'deal' && next.deal?.turn === me && prev?.deal?.turn !== me) return haptic('turn');
-  if (me && next.nominations.some((x) => x.target === me) && !prev?.nominations.some((x) => x.target === me)) return haptic('alert');
+  if (speech(next) && !(speech(prev) && prev!.phase === next.phase)) return signal('turn');
+  if (next.phase === 'deal' && next.deal?.turn === me && prev?.deal?.turn !== me) return signal('turn');
+  if (me && next.nominations.some((x) => x.target === me) && !prev?.nominations.some((x) => x.target === me)) return signal('alert');
   if (next.phase === 'voting' && prev?.phase !== 'voting') return haptic('tap');
   if (next.phase === 'night' && prev && (prev.phase !== 'night' || prev.nightStep !== next.nightStep) && pickMode(next)) return haptic('tap');
   if (next.phase === 'ended' && prev && prev.phase !== 'ended' && me) {
@@ -306,6 +313,8 @@ function render(): void {
   if (barEl && barKey !== shownBar) barEl.classList.add('enter');
   shownBar = barKey;
   layoutBars();
+  // Пока идёт партия, экран телефона не гаснет (игрок или ведущий; зрителю не нужно)
+  keepAwake(!!game && game.phase !== 'ended' && room?.you.kind !== 'spectator');
 
   // Системная кнопка «Назад» в Telegram: закрыть окно, выйти из профиля или правил
   if (sheetKey()) setBackButton(() => handlers.sheetClose(root));
