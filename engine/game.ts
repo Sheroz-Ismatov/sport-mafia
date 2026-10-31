@@ -6,7 +6,7 @@ import {
   DEFAULT_SETTINGS, MAX_PLAYERS, MIN_PLAYERS, SHERIFF_PHRASES, roleDeck, teamOf,
 } from './types.ts';
 import type {
-  Action, ActionResult, Actor, CheckResult, LiftVote, LogAudience, LogEntry, MafiaPlan,
+  Action, ActionResult, Actor, CheckResult, Hold, HoldKind, LiftVote, LogAudience, LogEntry, MafiaPlan,
   NightStep, Nomination, OutReason, Phase, Role, Seat, Settings, Team, Timer, Voting, Winner,
 } from './types.ts';
 
@@ -35,6 +35,8 @@ export class Game {
   night = 0;  // ночи со стрельбой: Ночь 1 идёт после Дня 1
   seats: Seat[] = [];
   timer: Timer | null = null;
+  hosted = false;          // живой ведущий: этапы начинает он
+  hold: Hold | null = null; // ждём, пока ведущий начнёт следующий этап
 
   // раздача
   deck: Role[] = [];
@@ -104,7 +106,9 @@ export class Game {
     if (hostOnly.includes(action.type)) this.requireHost(actor);
 
     switch (action.type) {
-      case 'start': return this.start(action.players, action.fixedSeats ?? false, action.roles, action.instantDeal ?? false);
+      case 'start':
+        this.hosted = !!action.hosted;
+        return this.start(action.players, action.fixedSeats ?? false, action.roles, action.instantDeal ?? false);
       case 'next':
         this.requireRunning();
         return this.advance();
@@ -183,8 +187,45 @@ export class Game {
     this.log.push({ at: this.now, day: this.day, night: this.night, text, audience });
   }
 
-  private startTimer(ms: number): void {
-    this.timer = { durationMs: ms, endsAt: this.now + ms, pausedRemainingMs: null };
+  /** soft: при живом ведущем по окончании времени игра не идёт дальше сама, ждёт ведущего. */
+  private startTimer(ms: number, soft = false): void {
+    this.timer = { durationMs: ms, endsAt: this.now + ms, pausedRemainingMs: null, ...(soft && this.hosted ? { soft: true } : {}) };
+  }
+
+  // ---------- Паузы перед этапами (живой ведущий) ----------
+
+  private holdFor(kind: HoldKind, candidates: number[] = [], previousTie: number[] | null = null): void {
+    this.hold = { kind, candidates: [...candidates], previousTie };
+    this.timer = null;
+    this.speaker = null;
+    this.speakerMuted = false;
+    this.voting = null;
+    this.liftVote = null;
+  }
+
+  /** Ведущий начал этап (или он не в сети, и сервер начал сам). */
+  private releaseHold(): void {
+    const h = this.hold!;
+    this.hold = null;
+    if (h.kind === 'zeroNight') return this.startZeroNight();
+    if (h.kind === 'night') return this.goNight();
+    if (this.noVoteDays.has(this.day)) {
+      this.write('Голосование отменено: за столом было удаление');
+      return this.toNight();
+    }
+    const candidates = h.candidates.filter((n) => this.seatOf(n).alive);
+    if (!candidates.length) return this.toNight();
+    this.startVoting(candidates, h.previousTie);
+  }
+
+  private toNight(): void {
+    if (this.hosted) return this.holdFor('night');
+    this.goNight();
+  }
+
+  private toVoting(candidates: number[], previousTie: number[] | null): void {
+    if (this.hosted) return this.holdFor('voting', candidates, previousTie);
+    this.startVoting(candidates, previousTie);
   }
 
   private markOut(n: number, reason: OutReason): void {
@@ -277,6 +318,7 @@ export class Game {
       return this.startTimer(this.settings.dealTurnMs);
     }
     this.dealTurn = null;
+    if (this.hosted) return this.holdFor('zeroNight');
     this.startZeroNight();
   }
 
@@ -285,7 +327,7 @@ export class Game {
     const roleName = { civilian: 'мирный', sheriff: 'шериф', mafia: 'мафия', don: 'дон' };
     this.write(`Роли: ${this.seats.map((s) => `№${s.seat} ${roleName[s.role]}`).join(', ')}`, 'host');
     this.write('Наступает ночь. Мафия знакомится и договаривается');
-    this.startTimer(this.settings.dogovorkaMs);
+    this.startTimer(this.settings.dogovorkaMs, true);
   }
 
   private requireDonAtZeroNight(seat: number): void {
@@ -317,6 +359,7 @@ export class Game {
   // ---------- Переход к следующему шагу (таймер или ведущий) ----------
 
   private advance(): void {
+    if (this.hold) return this.releaseHold();
     switch (this.phase) {
       case 'deal': return this.nextDealTurn();
       case 'zeroNight': {
@@ -393,18 +436,18 @@ export class Game {
     this.speakerMuted = false;
     if (this.noVoteDays.has(this.day)) {
       this.write('Голосование не проводится');
-      return this.goNight();
+      return this.toNight();
     }
     const candidates = this.nominations.map((n) => n.target).filter((n) => this.seatOf(n).alive);
     if (candidates.length === 0) {
       this.write('Никто не выставлен, голосования нет');
-      return this.goNight();
+      return this.toNight();
     }
     if (this.day === 1 && candidates.length === 1) {
       this.write(`В первый день выставлен только №${candidates[0]}, голосование не проводится`); // 4.4.10
-      return this.goNight();
+      return this.toNight();
     }
-    this.startVoting(candidates, null);
+    this.toVoting(candidates, null);
   }
 
   // ---------- Голосование ----------
@@ -414,7 +457,7 @@ export class Game {
     this.speaker = null;
     this.voting = { candidates, index: 0, votes: {}, previousTie };
     this.write(`Голосование. Кандидаты: ${candidates.map((n) => '№' + n).join(', ')}`);
-    this.startTimer(this.settings.voteWindowMs);
+    this.startTimer(this.settings.voteWindowMs, true);
   }
 
   private vote(seat: number, target: number): void {
@@ -429,7 +472,7 @@ export class Game {
   private closeVoteWindow(): void {
     const v = this.voting!;
     v.index++;
-    if (v.index < v.candidates.length) return this.startTimer(this.settings.voteWindowMs);
+    if (v.index < v.candidates.length) return this.startTimer(this.settings.voteWindowMs, true);
 
     // 4.4.8: кто не проголосовал, голосует против последнего кандидата
     const last = v.candidates[v.candidates.length - 1];
@@ -453,7 +496,7 @@ export class Game {
     if (!sameTie) return this.startTie(leaders); // 4.4.12, 4.4.12.2
     if (leaders.length === this.aliveSeats().length) {
       this.write('Голосование за подъём всего стола не проводится, все остаются'); // 7.8
-      return this.goNight();
+      return this.toNight();
     }
     this.startLift(leaders); // 4.4.12.3
   }
@@ -471,7 +514,7 @@ export class Game {
     const next = this.tieQueue.shift();
     if (next === undefined) {
       this.speaker = null;
-      return this.startVoting(this.tieCandidates, this.tieCandidates);
+      return this.toVoting(this.tieCandidates, this.tieCandidates);
     }
     this.speaker = next;
     this.speakerMuted = false; // 7.5: при 3 фолах в переголосовании слово есть
@@ -483,7 +526,7 @@ export class Game {
     this.voting = null;
     this.liftVote = { candidates, yes: [] };
     this.write(`Кто за то, чтобы ${candidates.map((n) => '№' + n).join(', ')} покинули стол?`);
-    this.startTimer(this.settings.voteWindowMs);
+    this.startTimer(this.settings.voteWindowMs, true);
   }
 
   private liftYes(seat: number): void {
@@ -501,7 +544,7 @@ export class Game {
     if (l.yes.length > alive / 2) return this.eliminateByVote(l.candidates);
     this.write('Большинства нет, все остаются');
     this.liftVote = null;
-    this.goNight();
+    this.toNight();
   }
 
   private eliminateByVote(seats: number[]): void {
@@ -530,7 +573,7 @@ export class Game {
     if (next === undefined) {
       this.speaker = null;
       if (this.winner) return this.end();
-      return this.afterLastWord === 'night' ? this.goNight() : this.startDay(this.day + 1);
+      return this.afterLastWord === 'night' ? this.toNight() : this.startDay(this.day + 1);
     }
     this.speaker = next;
     this.speakerMuted = false;
@@ -565,7 +608,7 @@ export class Game {
       bestMove: `Игрок №${this.nightKill}, вас убили. 20 секунд на лучший ход`,
     }[step];
     this.write(say);
-    this.startTimer(ms);
+    this.startTimer(ms, true);
   }
 
   private shoot(seat: number, target: number): void {
@@ -620,7 +663,7 @@ export class Game {
     if (seats.some((n) => !Number.isInteger(n) || n < 1 || n > this.size)) fail(`Только номера 1-${this.size}`);
     if (new Set(seats).size !== seats.length) fail('Номера не повторяются');
     this.bestMove = { by: seat, seats: [...seats] };
-    this.advance();
+    if (!this.hosted) this.advance(); // с ведущим утро объявляет он
   }
 
   private advanceNight(): void {
@@ -726,7 +769,7 @@ export class Game {
 
     if (abortVoting) {
       this.write('Голосование отменено');
-      return this.goNight();
+      return this.toNight();
     }
     if (this.speaker === n && ['day', 'tieSpeech', 'lastWord'].includes(this.phase)) this.advance();
   }
@@ -759,6 +802,7 @@ export class Game {
   private end(): void {
     this.phase = 'ended';
     this.timer = null;
+    this.hold = null;
     this.speaker = null;
     this.nightStep = null;
     const names = { red: 'красных', black: 'чёрных', draw: '' };

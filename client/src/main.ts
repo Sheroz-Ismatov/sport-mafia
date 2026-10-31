@@ -380,6 +380,8 @@ setInterval(() => {
   const left = remainingMs(game, store.offset);
   if (left === null) return;
   for (const el of root.querySelectorAll<HTMLElement>('[data-clock]')) el.textContent = clock(left);
+  // Время ночного шага или голосования вышло: у ведущего кнопка «Дальше» начинает мигать
+  root.querySelector('.soft-next')?.classList.toggle('due', left <= 0);
 }, 250);
 
 // ---------- Нажатия ----------

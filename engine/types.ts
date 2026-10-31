@@ -84,7 +84,15 @@ export interface Timer {
   durationMs: number;
   endsAt: number | null;        // null, пока таймер на паузе
   pausedRemainingMs: number | null;
+  soft?: boolean;               // при живом ведущем: время только подсказка, дальше игру ведёт ведущий
 }
+
+/**
+ * Пауза перед новым этапом при живом ведущем: игра ждёт, пока ведущий объявит
+ * «Город засыпает», «Голосование» и так далее. candidates — кого выставили (для голосования).
+ */
+export type HoldKind = 'zeroNight' | 'voting' | 'night';
+export interface Hold { kind: HoldKind; candidates: number[]; previousTie: number[] | null }
 
 export interface Nomination { target: number; by: number }
 
@@ -128,7 +136,8 @@ export type Action =
   // players — по порядку мест, если задано fixedSeats, иначе места разыгрываются.
   // roles — только для тестов: колода в заданном порядке (карта i достаётся месту i+1 при instantDeal).
   // instantDeal — только для тестов: пропустить раздачу.
-  | { type: 'start'; players: { playerId: string; nick: string }[]; fixedSeats?: boolean; roles?: Role[]; instantDeal?: boolean }
+  // hosted — за столом живой ведущий: этапы начинает он, таймеры ночи и голосования только подсказка.
+  | { type: 'start'; players: { playerId: string; nick: string }[]; fixedSeats?: boolean; roles?: Role[]; instantDeal?: boolean; hosted?: boolean }
   | { type: 'next' }                    // досрочно закончить текущий шаг
   | { type: 'pause' }
   | { type: 'resume' }

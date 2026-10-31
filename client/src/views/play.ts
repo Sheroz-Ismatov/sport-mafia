@@ -2,7 +2,7 @@
 
 import type { GameView } from '../../../engine/index.ts';
 import type { Store } from '../store.ts';
-import { ROLE_NAME, ROLE_SHORT, byGender, esc, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
+import { ROLE_NAME, ROLE_SHORT, byGender, esc, holdText, isBlackRole, outText, phaseTitle, NIGHT_STEP, winnerText } from '../util.ts';
 import { renderTable } from './table.ts';
 import { menuButton } from './exit.ts';
 import { finaleCard } from './finale.ts';
@@ -21,7 +21,7 @@ export interface PickMode {
 /** Можно ли сейчас выбирать номера за столом и зачем. */
 export function pickMode(game: GameView): PickMode | null {
   const me = game.me;
-  if (!me || !me.alive || game.phase === 'ended') return null;
+  if (!me || !me.alive || game.phase === 'ended' || game.hold) return null;
   const alive = (n: number) => game.seats[n - 1]?.alive ?? false;
   const known = (n: number) => game.seats[n - 1]?.role ?? null;
 
@@ -305,7 +305,9 @@ export function renderPlay(store: Store): string {
   const target = game.phase === 'night' && me?.alive ? game.mafia?.planTargetTonight ?? null : null;
   parts.push(renderTable(game, { mySeat: me?.seat ?? null, selected: store.selected, canPick: mode ? mode.allow : null, offset: store.offset, photos, target }));
 
-  switch (game.phase) {
+  if (game.hold) {
+    parts.push(`<div class="card gold hold-wait"><span class="eyebrow">Ждём ведущего</span><p class="note">${esc(holdText(game))}</p></div>`);
+  } else switch (game.phase) {
     case 'deal':
       parts.push(dealPanel(store, game));
       break;

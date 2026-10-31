@@ -3,7 +3,7 @@
 
 import { SHERIFF_PHRASES, teamOf } from './types.ts';
 import type {
-  CheckResult, LogAudience, NightStep, Nomination, OutReason, Phase, Role, Team, Timer, Winner,
+  CheckResult, HoldKind, LogAudience, NightStep, Nomination, OutReason, Phase, Role, Team, Timer, Winner,
 } from './types.ts';
 import type { Game } from './game.ts';
 
@@ -26,6 +26,7 @@ export interface GameView {
   night: number;
   nightStep: NightStep | null;
   timer: Timer | null;
+  hold: { kind: HoldKind; candidates: number[] } | null; // ждём, пока ведущий начнёт этап
   deal: { turn: number | null; takenBy: (number | null)[] } | null; // раздача: чей ход, кто какую карту взял
   speaker: number | null;
   speakerMuted: boolean;
@@ -134,6 +135,7 @@ export function viewFor(game: Game, viewer: Viewer): GameView {
     night: game.night,
     nightStep: game.nightStep,
     timer: game.timer ? { ...game.timer } : null,
+    hold: game.hold ? { kind: game.hold.kind, candidates: [...game.hold.candidates] } : null,
     deal: dealing ? { turn: game.dealTurn, takenBy: [...game.deckTakenBy] } : null,
     speaker: game.speaker,
     speakerMuted: game.speakerMuted,

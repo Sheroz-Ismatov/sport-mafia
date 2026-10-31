@@ -17,6 +17,22 @@ function controlCard(store: Store, game: GameView): string {
   let next = 'Дальше';
   let extra = '';
 
+  // Пауза перед этапом: игра ждёт, пока ведущий объявит его
+  if (game.hold) {
+    const h = game.hold;
+    const big = h.kind === 'zeroNight' ? '🌙 Город засыпает: договорка'
+      : h.kind === 'voting' ? '🗳 Начать голосование'
+      : `🌙 Город засыпает: ночь ${game.night + 1}`;
+    const what = h.kind === 'zeroNight' ? 'Карты розданы. Объяви ночь, и мафия познакомится'
+      : h.kind === 'voting' ? `Выставлены ${h.candidates.map((n) => '№' + n).join(', ')}. Объяви голосование`
+      : 'День закончен. Объяви ночь';
+    return `<div class="card accent hold-card">
+      <span class="eyebrow">Ждём твоей команды</span>
+      <b class="ctl-who">${what}</b>
+      <button class="btn primary hold-go" data-act="next">${big}</button>
+    </div>`;
+  }
+
   switch (game.phase) {
     case 'deal':
       label = 'Раздача карт';
@@ -26,7 +42,7 @@ function controlCard(store: Store, game: GameView): string {
     case 'zeroNight':
       label = 'Договорка мафии';
       who = game.host?.plan.length ? `План: ${game.host.plan.map((n) => '№' + n).join(', ')}` : 'Дон задаёт план';
-      next = 'Начать день';
+      next = '☀️ Город просыпается: день 1';
       break;
     case 'day':
       label = game.speakerMuted ? 'Молчит (3 фола)' : 'Говорит';
@@ -59,7 +75,12 @@ function controlCard(store: Store, game: GameView): string {
     case 'night':
       label = `Ночь ${game.night}`;
       who = NIGHT_STEP[game.nightStep ?? ''] ?? '';
-      next = 'Следующий шаг';
+      next = {
+        shoot: 'Мафия засыпает, просыпается дон',
+        don: 'Дон засыпает, просыпается шериф',
+        sheriff: game.night === 1 && game.host?.nightKill ? 'Шериф засыпает: лучший ход' : '☀️ Город просыпается',
+        bestMove: '☀️ Город просыпается',
+      }[game.nightStep ?? 'shoot'] ?? 'Дальше';
       break;
     case 'ended':
       return finaleCard(store, game);
@@ -69,11 +90,12 @@ function controlCard(store: Store, game: GameView): string {
     <div class="row"><div class="stack" style="gap:2px;min-width:0"><span class="eyebrow">${label}</span><b class="ctl-who">${who}</b></div>
       <span class="clock ctl-clock" data-clock style="color:${paused ? 'var(--amber)' : 'var(--accent)'}">${left === null ? '' : clock(left)}</span></div>
     ${paused ? '<p class="hint" style="color:var(--amber)">Пауза. Микрофон говорящего остаётся включённым.</p>' : ''}
+    ${game.timer?.soft ? '<p class="hint soft-hint">Время для подсказки: дальше игра идёт по твоей команде</p>' : ''}
     ${extra}
     <div class="grid3 controls">
       <button class="btn small" data-act="${paused ? 'resume' : 'pause'}" ${game.timer ? '' : 'disabled'}>${paused ? 'Продолжить' : 'Пауза'}</button>
       <button class="btn small" data-act="add30" ${game.timer ? '' : 'disabled'}>+30 с</button>
-      <button class="btn small primary" data-act="next">${next}</button>
+      <button class="btn small primary${game.timer?.soft ? ' soft-next' : ''}" data-act="next">${next}</button>
     </div>
   </div>`;
 }

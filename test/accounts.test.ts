@@ -111,7 +111,14 @@ test('аккаунты: вход, место по аккаунту, партия
     }
     await waitFor(() => host.last()!.room.players === 6);
     host.send({ t: 'start' });
-    await waitFor(() => host.last()?.game?.phase === 'ended', 60_000);
+    // Живой ведущий сам объявляет ночь, голосование и утро: здесь он жмёт «Дальше», когда игра ждёт его
+    const pilot = setInterval(() => {
+      const g = host.last()?.game;
+      if (g && g.phase !== 'ended' && (g.hold || (g.timer?.soft && (g.timer.endsAt ?? 0) <= Date.now()))) {
+        host.send({ t: 'act', action: { type: 'next' } });
+      }
+    }, 15);
+    await waitFor(() => host.last()?.game?.phase === 'ended', 60_000).finally(() => clearInterval(pilot));
 
     let me: any;
     for (let i = 0; i < 50; i++) {

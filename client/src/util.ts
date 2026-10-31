@@ -55,6 +55,7 @@ export function outText(s: SeatView): string {
 }
 
 export function phaseTitle(game: GameView): string {
+  if (game.hold) return { zeroNight: 'Карты розданы', voting: 'Перед голосованием', night: 'Перед ночью' }[game.hold.kind];
   switch (game.phase) {
     case 'deal': return 'Раздача карт';
     case 'zeroNight': return 'Договорка';
@@ -96,4 +97,13 @@ export function seatPosition(n: number, total = 10): { left: number; top: number
 /** Окончание по полу игрока: «выбыл» или «выбыла». Трансформеру мужской род. */
 export function byGender(gender: string, m: string, f: string): string {
   return gender === 'f' ? f : m;
+}
+
+/** Что объявит ведущий после паузы: для игроков и центра стола. */
+export function holdText(game: GameView): string {
+  const h = game.hold;
+  if (!h) return '';
+  if (h.kind === 'zeroNight') return 'Ведущий объявит ночь: мафия познакомится';
+  if (h.kind === 'voting') return `Ведущий начнёт голосование. Выставлены ${h.candidates.map((n) => '№' + n).join(', ')}`;
+  return 'Ведущий объявит ночь';
 }

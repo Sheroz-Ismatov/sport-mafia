@@ -29,6 +29,10 @@ function centerHtml(game: GameView, offset: number): string {
     return `<span class="who">№${n} ${esc(s?.nick)}</span>`;
   };
 
+  if (game.hold) {
+    const what = { zeroNight: 'Город засыпает', voting: 'Голосование', night: 'Город засыпает' }[game.hold.kind];
+    return `<span class="lbl">Ждём ведущего</span><span class="step">${what}</span><span class="sub">скоро объявит</span>`;
+  }
   switch (game.phase) {
     case 'deal':
       return `<span class="lbl">Тянет карту</span>${who(game.deal?.turn ?? null)}${timer}${sub}`;

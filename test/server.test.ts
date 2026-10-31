@@ -20,6 +20,7 @@ class Client {
   last: Extract<ServerMessage, { t: 'state' }> | null = null;
   errors: string[] = [];
   onState: ((c: Client) => void) | null = null;
+  pilotKey = '';
 
   constructor(url: string) {
     this.ws = new WebSocket(url);
@@ -61,6 +62,24 @@ function waitFor(check: () => boolean, ms = 15_000): Promise<void> {
     };
     tick();
   });
+}
+
+/**
+ * Ведущий-автомат: живой ведущий сам начинает договорку, голосование, ночь и каждый ночной шаг.
+ * Нажимает «Дальше», когда игра ждёт его (пауза перед этапом) или когда вышло время ночного шага.
+ */
+function hostPilot(c: Client): void {
+  const g = c.game;
+  if (!g || g.phase === 'ended' || (!g.hold && !g.timer?.soft)) return;
+  const key = JSON.stringify([g.phase, g.day, g.night, g.nightStep, g.hold?.kind, g.voting?.index, g.lift?.candidates]);
+  if (c.pilotKey === key) return;
+  c.pilotKey = key;
+  const wait = g.hold ? 20 : Math.max(20, (g.timer!.endsAt ?? Date.now()) - Date.now() + 5);
+  setTimeout(() => {
+    const now = c.game;
+    const same = now && JSON.stringify([now.phase, now.day, now.night, now.nightStep, now.hold?.kind, now.voting?.index, now.lift?.candidates]) === key;
+    if (same && c.ws.readyState === c.ws.OPEN) c.send({ t: 'act', action: { type: 'next' } });
+  }, wait);
 }
 
 /** Игрок-автомат: ходит только по тому, что пришло ему в GameView. */
@@ -139,6 +158,7 @@ test('целая партия по сети: ведущий, 10 игроков �
     await waitFor(() => players[0].errors.length > 0);
 
     for (const p of players) p.onState = autoplay;
+    host.onState = hostPilot;
     host.send({ t: 'start' });
     await waitFor(() => spectator.game?.phase === 'zeroNight');
     spectator.send({ t: 'act', action: { type: 'pass' } });
@@ -195,7 +215,7 @@ test('целая партия по сети: ведущий, 10 игроков �
   }
 });
 
-test('ведущий с ботами: партия доходит до конца сама', async () => {
+test('ведущий с ботами: этапы начинает ведущий, без него игра стоит', async () => {
   const srv = await startServer({ port: 0, settings: FAST, botDelayMs: [5, 20], gamesFile: null });
   const url = `ws://localhost:${(srv.server.address() as AddressInfo).port}`;
   try {
@@ -208,8 +228,61 @@ test('ведущий с ботами: партия доходит до конц�
     host.send({ t: 'addBots' });
     await waitFor(() => host.last?.room.players === 10);
     host.send({ t: 'start' });
+    // Карты розданы, а договорка не начинается, пока ведущий не объявит ночь
+    await waitFor(() => host.game?.hold?.kind === 'zeroNight');
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(host.game!.hold?.kind, 'zeroNight');
+    assert.equal(host.game!.timer, null);
+    host.send({ t: 'act', action: { type: 'next' } });
+    await waitFor(() => host.game?.phase === 'zeroNight');
+    // Договорка кончилась по времени, но день не начинается сам
+    assert.equal((host.game!.timer as { soft?: boolean } | null)?.soft, true);
+    await new Promise((r) => setTimeout(r, FAST.dogovorkaMs + 300));
+    assert.equal(host.game!.phase, 'zeroNight');
+    host.onState = hostPilot;
+    hostPilot(host);
     await waitFor(() => host.game?.phase === 'ended', 60_000);
     assert.ok(host.game!.winner);
+    assert.ok(host.game!.log.some((e) => /Ночь 1/.test(e.text)));
+  } finally {
+    await srv.close();
+  }
+});
+
+test('ведущий пропал со связи: этапы начинаются сами, вернулся: снова ждут его', async () => {
+  const srv = await startServer({ port: 0, settings: FAST, botDelayMs: [5, 20], gamesFile: null, holdFallbackMs: 200 });
+  const url = `ws://localhost:${(srv.server.address() as AddressInfo).port}`;
+  try {
+    const host = new Client(url);
+    await host.open();
+    host.send({ t: 'create', nick: 'Лео' });
+    await waitFor(() => host.code !== '');
+    host.send({ t: 'addBots' });
+    await waitFor(() => host.last?.room.players === 10);
+    host.send({ t: 'start' });
+    await waitFor(() => host.game?.hold?.kind === 'zeroNight');
+    const { code, token } = host;
+    host.ws.close();
+    // Без ведущего игра идёт до конца: паузы и ночные шаги заканчиваются сами
+    const watcher = new Client(url);
+    await watcher.open();
+    watcher.send({ t: 'join', code, nick: 'Зритель', as: 'spectator' });
+    await waitFor(() => (watcher.game?.night ?? 0) >= 1, 30_000);
+    // Ведущий вернулся: следующая пауза ждёт его
+    const back = new Client(url);
+    await back.open();
+    back.send({ t: 'resume', code, token });
+    await waitFor(() => back.game !== null);
+    // Ближайшая пауза или ночной шаг ждут ведущего и сами не кончаются
+    await waitFor(() => back.game?.phase === 'ended' || !!back.game?.hold || !!back.game?.timer?.soft, 30_000);
+    if (back.game!.phase !== 'ended') {
+      const step = () => JSON.stringify([back.game!.phase, back.game!.nightStep, back.game!.hold?.kind, back.game!.voting?.index]);
+      const before = step();
+      await new Promise((r) => setTimeout(r, 600));
+      assert.equal(step(), before, 'с ведущим на связи игра ждёт его команды');
+      back.send({ t: 'act', action: { type: 'next' } });
+      await waitFor(() => step() !== before);
+    }
   } finally {
     await srv.close();
   }
@@ -278,6 +351,7 @@ test('стол на 6 без ботов; 5 мало; после перезапу
         await waitFor(() => host.errors.some((e) => e.includes('хотя бы 6')));
       }
     }
+    host.onState = hostPilot;
     host.send({ t: 'start' });
     await waitFor(() => host.game?.phase === 'zeroNight');
     assert.equal(host.game!.seats.length, 6);

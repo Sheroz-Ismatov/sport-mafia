@@ -27,7 +27,7 @@ function confirmButton(store: Store, verb: string, cls: string, empty: string): 
 export function actionBar(store: Store, game: GameView, mode: PickMode | null): string {
   const me = game.me;
   const mySeat = game.mySeat;
-  if (!mySeat || game.phase === 'ended') return '';
+  if (!mySeat || game.phase === 'ended' || game.hold) return '';
 
   // Раздача: моя очередь тянуть карту, колода одним рядом прямо в панели
   if (game.phase === 'deal' && game.deal && game.deal.turn === mySeat && !me) {

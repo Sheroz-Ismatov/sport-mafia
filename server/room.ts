@@ -26,6 +26,7 @@ export interface RoomOptions {
   now?: () => number;
   rng?: () => number;
   botDelayMs?: [number, number];
+  holdFallbackMs?: number; // ведущий не в сети: через сколько начать этап самим (по умолчанию 15 с)
   maxSpectators?: number;
   onGameEnd?: (room: Room) => void;
   voice?: Voice | null; // голос через LiveKit; null — без голоса
@@ -67,6 +68,7 @@ export class Room {
       now: opts.now ?? Date.now,
       rng: opts.rng ?? Math.random,
       botDelayMs: opts.botDelayMs ?? [600, 1800],
+      holdFallbackMs: opts.holdFallbackMs ?? 15_000,
       maxSpectators: opts.maxSpectators ?? 200,
       settings: opts.settings,
       onGameEnd: opts.onGameEnd,
@@ -120,12 +122,14 @@ export class Room {
     m.send = send;
     this.emptySince = null;
     send({ t: 'welcome', code: this.code, token: m.token });
+    if (m.kind === 'host') this.schedule(); // ведущий вернулся: игра снова ждёт его команд
     this.broadcast();
   }
 
   disconnect(m: Member): void {
     m.send = null;
     this.checkEmpty();
+    if (m.kind === 'host') this.schedule(); // ведущий пропал: дальше игра идёт сама
     this.broadcast();
   }
 
@@ -142,6 +146,7 @@ export class Room {
   /** Выйти из комнаты насовсем. Во время игры место остаётся за игроком. */
   leave(m: Member): void {
     m.send = null;
+    if (m.kind === 'host') this.schedule();
     if (!this.game && m.kind !== 'host' && !this.isOwner(m)) this.members.delete(m.token);
     this.checkEmpty();
     this.broadcast();
@@ -218,6 +223,7 @@ export class Room {
     const r = game.dispatch({ kind: 'host' }, {
       type: 'start',
       players: players.map((p) => ({ playerId: p.id, nick: p.nick })),
+      hosted: !!this.host(), // живой ведущий сам начинает ночь, голосование и утро
     }, this.opts.now());
     if (!r.ok) return r.error;
     this.game = game;
@@ -284,12 +290,32 @@ export class Room {
     }
   }
 
+  /** Ведущий сейчас на связи: тогда ночь, голосование и утро ждут его команды. */
+  private hostOnline(): boolean {
+    return !!this.host()?.send;
+  }
+
   /** Ставит серверный таймер на конец текущего шага. */
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    const endsAt = this.game?.timer?.endsAt;
-    if (endsAt == null || this.game!.phase === 'ended') return;
+    const game = this.game;
+    if (!game || game.phase === 'ended') return;
+    // Пауза перед этапом: ждём ведущего. Если он пропал со связи, через 15 с начинаем сами
+    if (game.hold) {
+      if (this.hostOnline()) return;
+      const hold = game.hold;
+      this.timer = setTimeout(() => this.safely(() => {
+        this.timer = null;
+        if (this.game !== game || game.hold !== hold) return;
+        if (game.dispatch({ kind: 'system' }, { type: 'timeout' }, this.opts.now()).ok) this.afterChange();
+      }), this.opts.holdFallbackMs);
+      return;
+    }
+    const endsAt = game.timer?.endsAt;
+    if (endsAt == null) return;
+    // Время ночного шага или голосования вышло: дальше по команде ведущего (если он на связи)
+    if (game.timer?.soft && this.hostOnline()) return;
     const delay = Math.max(0, endsAt - this.opts.now());
     this.timer = setTimeout(() => this.safely(() => {
       this.timer = null;

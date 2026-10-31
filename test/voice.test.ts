@@ -152,6 +152,13 @@ test('кто может говорить: лобби, раздача, речь, 
   await waitFor(() => voice.idle());
 
   assert.equal(room.handle(host, { t: 'start' }), null);
+  // Ведущий объявляет этапы: жмёт «Дальше», когда игра ждёт его
+  const pilot = setInterval(() => {
+    const g = room.game;
+    if (g && g.phase !== 'ended' && (g.hold || (g.timer?.soft && (g.timer.endsAt ?? 0) <= Date.now()))) {
+      room.handle(host, { t: 'act', action: { type: 'next' } });
+    }
+  }, 10);
   // Раздача и договорка: молчат все игроки
   assert.ok(people.every((p) => !room.canSpeak(p)));
   assert.equal(room.canSpeak(host), true);
@@ -176,5 +183,6 @@ test('кто может говорить: лобби, раздача, речь, 
   await waitFor(() => room.game!.phase === 'night', 20_000);
   assert.ok(people.every((p) => !room.canSpeak(p)));
   assert.equal(room.canSpeak(host), true);
+  clearInterval(pilot);
   room.close('конец теста');
 });

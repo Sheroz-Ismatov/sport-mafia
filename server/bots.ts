@@ -14,6 +14,7 @@ export function botAction(game: Game, seat: number, rng: () => number = Math.ran
   const alive = game.aliveSeats();
   const others = alive.filter((n) => n !== seat);
   const black = teamOf(me.role) === 'black';
+  if (game.hold) return null; // ждём ведущего
 
   switch (game.phase) {
     case 'deal': {

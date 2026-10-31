@@ -12,6 +12,7 @@ const EAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0
 /** Почему микрофон закрыт: короткая подсказка по фазе игры. */
 function closedReason(game: GameView | null): string {
   if (!game) return '';
+  if (game.hold) return 'ждём ведущего';
   if (['day', 'tieSpeech', 'lastWord'].includes(game.phase) && game.speaker !== null) return `слово у №${game.speaker}`;
   if (game.phase === 'night' || game.phase === 'zeroNight') return 'ночь, город молчит';
   if (game.phase === 'voting' || game.phase === 'liftVote') return 'идёт голосование';

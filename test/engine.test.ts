@@ -453,3 +453,92 @@ test('стол на 7: раздача, речи по кругу из 7, парт
   while (g.phase === 'lastWord') ok(P(g.speaker!), { type: 'pass' });
   assert.equal(g.phase, 'ended');
 });
+
+/** Через функцию, чтобы TypeScript не сужал тип timer после проверок выше. */
+const softTimer = (g: Game) => g.timer?.soft;
+
+test('живой ведущий: этапы начинает он, ночные шаги и голосование не кончаются сами', () => {
+  const g = new Game();
+  let now = 1000;
+  const act = (actor: Actor, action: Action) => {
+    now += 10;
+    const r = g.dispatch(actor, action, now);
+    assert.ok(r.ok, r.ok ? '' : r.error);
+  };
+  act(HOST, { type: 'start', players, fixedSeats: true, roles: ROLES, hosted: true });
+  // Раздача идёт по ходам игроков, а после неё пауза
+  for (let s = 1; s <= 10; s++) act(P(s), { type: 'pickCard', index: s - 1 }), act(SYS, { type: 'timeout' });
+  assert.equal(g.hold?.kind, 'zeroNight');
+  assert.equal(g.timer, null);
+  assert.equal(g.phase, 'deal');
+  assert.equal(viewFor(g, { kind: 'player', seat: 3 }).mafia, null, 'чёрные узнают друг друга только на договорке');
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'zeroNight');
+  assert.equal(softTimer(g), true, 'время договорки только подсказка');
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'day');
+  assert.equal(softTimer(g), undefined, 'минута речи кончается сама');
+
+  // День: №1 выставляет №3, №2 выставляет №4, речи по кругу, потом пауза перед голосованием
+  while (g.phase === 'day' && !g.hold) {
+    const s = g.speaker!;
+    if (s === 1) act(P(1), { type: 'nominate', target: 3 });
+    if (s === 2) act(P(2), { type: 'nominate', target: 4 });
+    act(P(s), { type: 'pass' });
+  }
+  assert.deepEqual(g.hold, { kind: 'voting', candidates: [3, 4], previousTie: null });
+  assert.deepEqual(g.micOpen(), [], 'пока ведущий не начал голосование, все молчат');
+  assert.deepEqual(viewFor(g, { kind: 'spectator' }).hold, { kind: 'voting', candidates: [3, 4] });
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'voting');
+  assert.equal(softTimer(g), true);
+  for (const v of [1, 2, 4, 5, 6, 7]) act(P(v), { type: 'vote', target: 3 });
+  act(HOST, { type: 'next' });
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'lastWord');
+  assert.equal(g.speaker, 3);
+  act(P(3), { type: 'pass' });
+  assert.equal(g.hold?.kind, 'night', 'после последней минуты пауза: город засыпает по команде');
+  assert.equal(g.phase, 'lastWord');
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'night');
+  assert.equal(g.nightStep, 'shoot');
+  act(P(5), { type: 'shoot', target: 1 });
+  act(P(8), { type: 'shoot', target: 1 });
+  act(HOST, { type: 'next' });
+  assert.equal(g.nightStep, 'don');
+  act(HOST, { type: 'next' });
+  act(HOST, { type: 'next' });
+  assert.equal(g.nightStep, 'bestMove');
+  act(P(1), { type: 'bestMove', seats: [3, 5, 8] });
+  assert.equal(g.nightStep, 'bestMove', 'утро объявляет ведущий, а не лучший ход');
+  act(HOST, { type: 'next' });
+  assert.equal(g.phase, 'lastWord');
+  assert.equal(g.speaker, 1);
+  act(P(1), { type: 'pass' });
+  assert.equal(g.phase, 'day', 'после последнего слова убитого день начинается сам');
+  assert.equal(g.day, 2);
+});
+
+test('живой ведущий: удаление перед голосованием отменяет его по команде ведущего', () => {
+  const g = new Game();
+  let now = 1000;
+  const act = (actor: Actor, action: Action) => {
+    now += 10;
+    const r = g.dispatch(actor, action, now);
+    assert.ok(r.ok, r.ok ? '' : r.error);
+  };
+  act(HOST, { type: 'start', players, fixedSeats: true, roles: ROLES, instantDeal: true, hosted: true });
+  act(HOST, { type: 'next' });
+  while (g.phase === 'day' && !g.hold) {
+    const s = g.speaker!;
+    if (s === 1) act(P(1), { type: 'nominate', target: 3 });
+    if (s === 2) act(P(2), { type: 'nominate', target: 4 });
+    act(P(s), { type: 'pass' });
+  }
+  assert.equal(g.hold?.kind, 'voting');
+  act(HOST, { type: 'remove', seat: 7 });
+  act(HOST, { type: 'next' });
+  assert.equal(g.hold?.kind, 'night');
+  assert.ok(g.log.some((e) => /Голосование отменено/.test(e.text)));
+});
